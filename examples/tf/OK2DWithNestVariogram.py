@@ -1,0 +1,51 @@
+from tfinterpy.tf.krige import TFOK
+from tfinterpy.grid import Grid2D
+import tensorflow as tf
+from examples.ncFileUtil import getSamples
+from examples.plotUtils import *
+import numpy as np
+from tfinterpy.utils import calcVecs
+from tfinterpy.variogram import calculateOmnidirectionalVariogram2D
+from tfinterpy.tf.variogramLayer import getNestVariogramLayer
+import random
+
+if __name__ == "__main__":
+    random.seed(1)
+    W, H = 200, 200
+    M = 100
+    offset = (200, 0)
+    N = 8
+    samples, lats, lons, ele = getSamples("../data/tatitlek_815_mhhw_2011.nc", 'lat', 'lon', 'Band1',
+                                          offset, (W, H), M)
+    grid = Grid2D()
+    grid.rectlinear((W, H), (1, W), (1, H))
+
+    vecs = calcVecs(samples, repeat=False)
+    vecs[:, 2] = 0.5 * vecs[:, 2] ** 2
+    vars = vecs[:, 2]
+    vecs = vecs[:, :2]
+    nestVariogram, variogramBuilders = calculateOmnidirectionalVariogram2D(vecs, vars)
+    nestVariogramLayer = getNestVariogramLayer(variogramBuilders, nestVariogram.unitVectors)
+
+    exe = TFOK(samples)
+
+    with tf.device("/GPU:0"):
+        grid.pro, grid.sigma = exe.execute(grid.points(), N, nestVariogramLayer, 10000)
+
+    print(exe.crossValidateKFold(10, N, nestVariogramLayer))
+    print(exe.crossValidate(N, nestVariogramLayer))
+
+    pro = grid.pro.reshape((grid.dim[1], grid.dim[0]))
+    sigma = grid.sigma.reshape((grid.dim[1], grid.dim[0]))
+    plt.figure(figsize=(8, 8))
+    plt.subplot(221)
+    img2d(ele, title="origin")
+    plt.subplot(222)
+    img2d(pro, title="estimate")
+    absdiff = np.abs(pro - ele)
+    plt.subplot(223)
+    img2d(absdiff, title="error")
+    print('result MAE:', np.mean(absdiff))
+    plt.subplot(224)
+    img2d(sigma, title="krige variance")
+    plt.show()

@@ -1,0 +1,5 @@
+*.ui
+*.log
+__pycache__/
+.idea/
+examples/savedData/
