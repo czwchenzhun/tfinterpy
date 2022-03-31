@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 
 
-def tfskWithVariogram():
+if __name__ == "__main__":
     filePath = "../data/sample_data.gslib"
     N = 8
     df = readGslibPoints(filePath)
@@ -34,7 +34,7 @@ def tfskWithVariogram():
 
     exe = TFOK(samples, '3d')
     with tf.device("/GPU:0"):
-        grid.pro, grid.sigma = exe.execute(grid.points(), N, vl, 10000)
+        grid.pro, grid.sigma = exe.execute(grid.points(), N, vl, batch_size=10000)
 
     print(exe.crossValidateKFold(10, N, vl))
     print(exe.crossValidate(N, vl))
@@ -45,7 +45,3 @@ def tfskWithVariogram():
     actor = createGridActor(*grid.dim, grid.x, grid.y, grid.z, grid.sigma, None, CM.Rainbow)
     rendering(actor)
     saveVTKGrid('../savedData/grid.vtk', actor.GetMapper().GetInput())
-
-
-if __name__ == "__main__":
-    tfskWithVariogram()

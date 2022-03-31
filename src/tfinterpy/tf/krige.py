@@ -44,7 +44,7 @@ class TFSK:
             self._i = 3
         self.innerVecs = None
 
-    def execute(self, points, N=8, variogramLayer=None, batch_size=1000):
+    def execute(self, points, N=8, variogramLayer=None, batch_size=10000):
         self.N = N
         self.model = SKModel(N, variogramLayer, self._i)
         isNest = variogramLayer.__class__ == NestVariogramLayer
@@ -59,23 +59,33 @@ class TFSK:
             self.innerVars = variogramLayer(self.innerVars).numpy()
 
         tree = cKDTree(self.samples[:, :self._i])
-        nbd, nbIdx = tree.query(points, k=N, eps=0.0)
-        kmatList = []
-        mvecList = []
-        neighProList = []
-        for idx, indice in enumerate(nbIdx):
-            kmat = self.__getKrigeMat__(indice)
-            if isNest:
-                mvec = self.samples[indice, :self._i] - points[idx]
-            else:
-                mvec = nbd[idx]
-            kmatList.append(kmat)
-            mvecList.append(mvec)
-            neighProList.append(self.samples[indice, self._i])
-        kmatArr = np.array(kmatList)
-        mvecArr = np.array(mvecList)
-        neighProArr = np.array(neighProList)
-        pros, sigmas = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
+        step = batch_size * 2
+        num = int(np.ceil(len(points) / step))
+        pros = np.empty((0, 1))
+        sigmas = np.empty((0, 1))
+        for i in range(num):
+            begin = i * step
+            end = (i + 1) * step
+            points_ = points[begin:end]
+            nbd, nbIdx = tree.query(points_, k=N, eps=0.0)
+            kmatList = []
+            mvecList = []
+            neighProList = []
+            for idx, indice in enumerate(nbIdx):
+                kmat = self.__getKrigeMat__(indice)
+                if isNest:
+                    mvec = self.samples[indice, :self._i] - points_[idx]
+                else:
+                    mvec = nbd[idx]
+                kmatList.append(kmat)
+                mvecList.append(mvec)
+                neighProList.append(self.samples[indice, self._i])
+            kmatArr = np.array(kmatList)
+            mvecArr = np.array(mvecList)
+            neighProArr = np.array(neighProList)
+            pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
+            pros = np.append(pros, pro)
+            sigmas = np.append(sigmas, sigma)
         return pros, sigmas
 
     def crossValidateKFold(self, K=10, N=8, variogramLayer=None):
@@ -136,7 +146,7 @@ class TFSK:
         kmatArr = np.array(kmatList)
         mvecArr = np.array(mvecList)
         neighProArr = np.array(neighProList)
-        pros, _ = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=1000)
+        pros, _ = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=10000)
         pros = pros.reshape(-1)
         error = pros - self.samples[:, self._i]
         absError = np.abs(error)
@@ -213,7 +223,7 @@ class TFOK:
             self._i = 3
         self.innerVecs = None
 
-    def execute(self, points, N=8, variogramLayer=None, batch_size=1000):
+    def execute(self, points, N=8, variogramLayer=None, batch_size=10000):
         self.N = N
         self.model = OKModel(N, variogramLayer, self._i)
         isNest = variogramLayer.__class__ == NestVariogramLayer
@@ -227,28 +237,38 @@ class TFOK:
             self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
             self.innerVars = variogramLayer(self.innerVars).numpy()
 
-        tree = cKDTree(self.samples[:, :self._i])
-        nbd, nbIdx = tree.query(points, k=self.N, eps=0.0)
-        kmatList = []
-        mvecList = []
-        neighProList = []
         if self.mode.lower() == '2d':
             addon = np.array([[0.0, 0.0]])
         else:
             addon = np.array([[0.0, 0.0, 0.0]])
-        for idx, indice in enumerate(nbIdx):
-            kmat = self.__getKrigeMat__(indice)
-            if isNest:
-                mvec = np.append(self.samples[indice, :self._i] - points[idx], addon, axis=0)
-            else:
-                mvec = np.append(nbd[idx], 1.0)
-            kmatList.append(kmat)
-            mvecList.append(mvec)
-            neighProList.append(self.samples[indice, self._i])
-        kmatArr = np.array(kmatList)
-        mvecArr = np.array(mvecList)
-        neighProArr = np.array(neighProList)
-        pros, sigmas = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
+        tree = cKDTree(self.samples[:, :self._i])
+        step = batch_size * 2
+        num = int(np.ceil(len(points) / step))
+        pros = np.empty((0, 1))
+        sigmas = np.empty((0, 1))
+        for i in range(num):
+            begin = i * step
+            end = (i + 1) * step
+            points_ = points[begin:end]
+            nbd, nbIdx = tree.query(points_, k=self.N, eps=0.0)
+            kmatList = []
+            mvecList = []
+            neighProList = []
+            for idx, indice in enumerate(nbIdx):
+                kmat = self.__getKrigeMat__(indice)
+                if isNest:
+                    mvec = np.append(self.samples[indice, :self._i] - points_[idx], addon, axis=0)
+                else:
+                    mvec = np.append(nbd[idx], 1.0)
+                kmatList.append(kmat)
+                mvecList.append(mvec)
+                neighProList.append(self.samples[indice, self._i])
+            kmatArr = np.array(kmatList)
+            mvecArr = np.array(mvecList)
+            neighProArr = np.array(neighProList)
+            pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
+            pros = np.append(pros, pro)
+            sigmas = np.append(sigmas, sigma)
         return pros, sigmas
 
     def crossValidateKFold(self, K=10, N=8, variogramLayer=None):
@@ -313,7 +333,7 @@ class TFOK:
         kmatArr = np.array(kmatList)
         mvecArr = np.array(mvecList)
         neighProArr = np.array(neighProList)
-        pros, _ = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=1000)
+        pros, _ = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=10000)
         pros = pros.reshape(-1)
         error = pros - self.samples[:, self._i]
         absError = np.abs(error)

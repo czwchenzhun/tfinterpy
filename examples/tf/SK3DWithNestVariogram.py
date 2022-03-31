@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 
 
-def tfskWithVariogram():
+if __name__ == "__main__":
     filePath = "../data/sample_data.gslib"
     N = 8
     df = readGslibPoints(filePath)
@@ -46,6 +46,3 @@ def tfskWithVariogram():
     rendering(actor)
     saveVTKGrid('../savedData/grid.vtk', actor.GetMapper().GetInput())
 
-
-if __name__ == "__main__":
-    tfskWithVariogram()

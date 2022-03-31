@@ -24,6 +24,7 @@ from tfinterpy.tf.variogramLayer import getVariogramLayer, getNestVariogramLayer
 from tfinterpy.gslib.fileUtils import readGslibPoints, saveGslibPoints, saveGslibGrid
 from tfinterpy.vtk.fileUtils import saveVTKPoints, saveVTKGrid
 from scipy.optimize import least_squares
+import time
 
 ColorMap = colorMap.Rainbow
 
@@ -43,6 +44,7 @@ class Tool(QMainWindow, Ui_MainWindow):
         self.vl = None
         self.vb = None
         self.grid = None
+
 
     def initUi(self):
         self.vtkWidget = QVTKRenderWindowInteractor(self.tab_interp)
@@ -164,6 +166,8 @@ class Tool(QMainWindow, Ui_MainWindow):
         self.cols = cols
 
     def onCalcVariogramClicked(self):
+        self.statusBar.showMessage("Processing...",10000)
+        begin=time.perf_counter()
         self.setupSamples()
         if self.samples is None:
             return
@@ -256,6 +260,9 @@ class Tool(QMainWindow, Ui_MainWindow):
         self.tabWidget.setCurrentIndex(1)
         self.rb_variogramCalced.setEnabled(True)
         self.rb_variogramCalced.setChecked(True)
+        end = time.perf_counter()
+        t = end - begin
+        self.statusBar.showMessage("Time consumed(/s): {:.4f}".format(t),10000)
 
     def onShowPointsClicked(self):
         if self.actorPS is not None:
@@ -561,12 +568,17 @@ class Tool(QMainWindow, Ui_MainWindow):
         if self.samples is None:
             QMessageBox.critical(self, "Error", "No sample data!")
             return
+        self.statusBar.showMessage("Processing...", 5000)
+        begin = time.perf_counter()
         if self.rb_interp.isChecked():
             if not self.interp():
                 return
             self.showGrid()
         else:
             self.cv()
+        end = time.perf_counter()
+        t = end - begin
+        self.statusBar.showMessage("Time consumed(/s): {:.4f}".format(t),5000)
 
     def variogramModel(self):
         return self.comb_variogramModel.currentText()

@@ -30,15 +30,23 @@ class TFIDW:
     def execute(self, points, N=8, alpha=2, batch_size=1000):
         self.model = IDWModel(N, alpha)
         tree = cKDTree(self.samples[:, :self._i])
-        nbd, nbIdx = tree.query(points, k=N, eps=0.0)
-        hList = []
-        neighProList = []
-        for idx, indice in enumerate(nbIdx):
-            hList.append(nbd[idx])
-            neighProList.append(self.samples[indice, self._i])
-        hArr = np.array(hList)
-        neighProArr = np.array(neighProList)
-        pros = self.model.predict([hArr, neighProArr], batch_size=batch_size)
+        step = batch_size * 2
+        num = int(np.ceil(len(points) / step))
+        pros = np.empty((0, 1))
+        for i in range(num):
+            begin = i * step
+            end = (i + 1) * step
+            points_ = points[begin:end]
+            nbd, nbIdx = tree.query(points_, k=N, eps=0.0)
+            hList = []
+            neighProList = []
+            for idx, indice in enumerate(nbIdx):
+                hList.append(nbd[idx])
+                neighProList.append(self.samples[indice, self._i])
+            hArr = np.array(hList)
+            neighProArr = np.array(neighProList)
+            pro = self.model.predict([hArr, neighProArr], batch_size=batch_size)
+            pros = np.append(pros, pro)
         return pros
 
     def crossValidateKFold(self, K=10, N=8, alpha=2):
