@@ -9,10 +9,8 @@ if __name__ == "__main__":
     M = 100
     offset = (100, 100)
     samples, lats, lons, ele = getSamples(filePath, 'lat', 'lon', 'Band1', offset, (W, H), M)
-    vecs = calcVecs(samples, repeat=False)
-    vars = (vecs[:, 2] ** 2) * 0.5
-    vecs = vecs[:, :2]
-    nestVariogram, variogramBuilders = calculateOmnidirectionalVariogram2D(vecs, vars)
+
+    nestVariogram, variogramBuilders = calculateOmnidirectionalVariogram2D(samples)
     for vb in variogramBuilders:
         plt.figure()
         vb.showVariogram()

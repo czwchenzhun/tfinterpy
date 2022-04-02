@@ -7,9 +7,8 @@ import pandas as pd
 if __name__ == '__main__':
     df = pd.read_csv("data/AustraliaTemperature20210101.csv")
     samples = df[["LONGITUDE", "LATITUDE", "TEMP"]].values
-    vecs = calcVecs(samples, repeat=False)
-    vecs[:, 2] = 0.5 * vecs[:, 2] ** 2
-    nv, vbs = calculateOmnidirectionalVariogram2D(vecs[:, :2], vecs[:, 2], model=None)
+
+    nv, vbs = calculateOmnidirectionalVariogram2D(samples, model=None)
     for vb in vbs:
         plt.figure()
         vb.showVariogram()

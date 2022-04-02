@@ -17,9 +17,8 @@ if __name__ == "__main__":
     grid = Grid2D()
     grid.rectlinear((W, H), (1, W), (1, H))
     exe = SK(samples)
-    vecs = calcVecs(samples, repeat=False)
-    vecs[:, 2] = 0.5 * vecs[:, 2] ** 2
-    nv, vbs = calculateOmnidirectionalVariogram2D(vecs[:, :2], vecs[:, 2])
+
+    nv, vbs = calculateOmnidirectionalVariogram2D(samples)
     indice = [i for i in range(0, len(nv.variograms), 2)]
     variograms = [nv.variograms[i] for i in indice]
     nv.variograms = variograms

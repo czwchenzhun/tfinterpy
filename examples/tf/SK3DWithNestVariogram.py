@@ -22,10 +22,7 @@ if __name__ == "__main__":
     grid.rectlinear((100, 100, 10), (samples[:, 0].min(), samples[:, 0].max()),
                     (samples[:, 1].min(), samples[:, 1].max()), (samples[:, 2].min(), samples[:, 2].max()))
 
-    vecs = calcVecs(samples, repeat=False)
-    vars = 0.5 * vecs[:, 3] ** 2
-    vecs = vecs[:, :3]
-    nestVariogram, variogramBuilders = calculateOmnidirectionalVariogram3D(vecs, vars, [5, 5])
+    nestVariogram, variogramBuilders = calculateOmnidirectionalVariogram3D(samples, [5, 5])
     for vb in variogramBuilders:
         plt.figure()
         vb.showVariogram()

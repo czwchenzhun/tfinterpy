@@ -20,10 +20,7 @@ if __name__ == "__main__":
     grid = Grid2D()
     grid.rectlinear((W, H), (1, W), (1, H))
 
-    vecs = calcVecs(samples, repeat=False)
-    vars = 0.5 * vecs[:, 2] ** 2
-    vecs = vecs[:, :2]
-    nestVariogram, variogramBuilders = calculateOmnidirectionalVariogram2D(vecs, vars)
+    nestVariogram, variogramBuilders = calculateOmnidirectionalVariogram2D(samples)
     nestVariogramLayer = getNestVariogramLayer(variogramBuilders, nestVariogram.unitVectors)
 
     exe = TFSK(samples)

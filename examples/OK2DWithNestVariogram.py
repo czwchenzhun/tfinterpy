@@ -18,9 +18,7 @@ if __name__ == "__main__":
     grid = Grid2D()
     grid.rectlinear((W, H), (1, W), (1, H))
 
-    vecs = calcVecs(samples, repeat=False)
-    vecs[:, 2] = 0.5 * vecs[:, 2] ** 2
-    nv, vbs = calculateOmnidirectionalVariogram2D(vecs[:, :2], vecs[:, 2], model=None)
+    nv, vbs = calculateOmnidirectionalVariogram2D(samples, model=None)
     for vb in vbs:
         plt.figure()
         vb.showVariogram()

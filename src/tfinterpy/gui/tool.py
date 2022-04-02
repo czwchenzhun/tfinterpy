@@ -216,13 +216,10 @@ class Tool(QMainWindow, Ui_MainWindow):
             else:
                 self.vb = calculateDefaultVariogram2D(self.samples, self.variogramModel())
         else:
-            vecs = calcVecs(self.samples, repeat=False)
-            vars = 0.5 * vecs[:, -1] ** 2
-            vecs = vecs[:, :-1]
             if self.check_fieldZ.isChecked():
-                self.vb = calculateOmnidirectionalVariogram3D(vecs, vars)
+                self.vb = calculateOmnidirectionalVariogram3D(self.samples)
             else:
-                self.vb = calculateOmnidirectionalVariogram2D(vecs, vars)
+                self.vb = calculateOmnidirectionalVariogram2D(self.samples)
         if type(self.vb) == tuple:
             self.canvasVariogram.fig.clear()
             nestVariogram, variogramBuilders = self.vb

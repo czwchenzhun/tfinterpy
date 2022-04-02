@@ -63,8 +63,11 @@ class NestVariogram:
         return totalVar
 
 
-def calculateOmnidirectionalVariogram2D(vecs, vars, partitionNum=8, leastPairNum=10, lagNum=20, lagInterval=None,
+def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10, lagNum=20, lagInterval=None,
                                         lagTole=None, bandWidth=None, model=None):
+    vecs = calcVecs(samples, repeat=False)
+    vars = 0.5 * vecs[:, 2] ** 2
+    vecs = vecs[:, :2]
     azimuthStep = np.pi / partitionNum
     unitVectors = []
     azimuths = []
@@ -133,8 +136,11 @@ def calculateOmnidirectionalVariogram2D(vecs, vars, partitionNum=8, leastPairNum
     return nestVariogram, variogramBuilders
 
 
-def calculateOmnidirectionalVariogram3D(vecs, vars, partitionNum=[6, 6], leastPairNum=10, lagNum=20, lagInterval=None,
+def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairNum=10, lagNum=20, lagInterval=None,
                                         lagTole=None, bandWidth=None, model=None):
+    vecs = calcVecs(samples, repeat=False)
+    vars = 0.5 * vecs[:, 3] ** 2
+    vecs = vecs[:, :3]
     if type(partitionNum) != list:
         partitionNum = [partitionNum, partitionNum]
     azimuthStep = np.pi / partitionNum[0]
