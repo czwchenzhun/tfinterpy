@@ -243,7 +243,7 @@ class Tool(QMainWindow, Ui_MainWindow):
                 axes.set_title(text)
                 axes.set_xlabel('distance')  # ,loc='right')
                 axes.set_ylabel('variance')  # ,loc='top')
-            self.canvasVariogram.fig.subplots_adjust(wspace=0.5, hspace=0.5)
+            self.canvasVariogram.fig.subplots_adjust(wspace=0.5, hspace=0.7)
             self.canvasVariogram.draw()
             self.canvasVariogram.show()
         else:
