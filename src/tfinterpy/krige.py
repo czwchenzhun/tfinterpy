@@ -24,23 +24,24 @@ class SK:
         else:
             self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
             self.innerVars = variogram(self.innerVars)
+        if self.innerVars.shape[-1] == 1:
+            self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(points, k=N, eps=0.0)
         properties = np.zeros((len(points)))
         sigmas = np.zeros((len(points)))
-        self.kmat = np.zeros((N, N))
         for idx, indice in enumerate(nbIdx):
-            self.__getKrigeMat__(indice)
+            kmat = self.innerVars[indice][:, indice]
             if variogram.__class__ == NestVariogram:
                 mvec = self.samples[indice, :self._i] - points[idx]
                 mvec = variogram(mvec)
             else:
                 mvec = variogram(nbd[idx])
             try:
-                lambvec = np.linalg.inv(self.kmat).dot(mvec)
+                lambvec = np.linalg.inv(kmat).dot(mvec)
             except:
-                lambvec = np.linalg.pinv(self.kmat).dot(mvec)
+                lambvec = np.linalg.pinv(kmat).dot(mvec)
             pro = np.dot(self.samples[:, self._i][indice], lambvec)
             properties[idx] = pro + np.mean(self.samples[:, self._i][indice]) * (1 - np.sum(lambvec))
             sigmas[idx] = np.dot(lambvec, mvec)
@@ -83,25 +84,24 @@ class SK:
         else:
             self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
             self.innerVars = variogram(self.innerVars)
+        if self.innerVars.shape[-1] == 1:
+            self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        self.kmat = np.zeros((N, N))
-        self.mvec = np.zeros((N))
         properties = np.zeros((len(self.samples)))
-        self.kmat = np.zeros((N, N))
         for idx, indice in enumerate(nbIdx):
             indice = indice[1:]
-            self.__getKrigeMat__(indice)
+            kmat = self.innerVars[indice][:, indice]
             if variogram.__class__ == NestVariogram:
                 mvec = self.samples[indice, :self._i] - self.samples[idx, :self._i]
                 mvec = variogram(mvec)
             else:
                 mvec = variogram(nbd[idx][1:])
             try:
-                lambvec = np.linalg.inv(self.kmat).dot(mvec)
+                lambvec = np.linalg.inv(kmat).dot(mvec)
             except:
-                lambvec = np.linalg.pinv(self.kmat).dot(mvec)
+                lambvec = np.linalg.pinv(kmat).dot(mvec)
             pro = np.dot(self.samples[:, self._i][indice], lambvec)
             properties[idx] = pro + np.mean(self.samples[:, self._i][indice]) * (1 - np.sum(lambvec))
         error = properties - self.samples[:, self._i]
@@ -109,11 +109,6 @@ class SK:
         mean = absError.mean()
         std = absError.std()
         return mean, std, error
-
-    def __getKrigeMat__(self, indice):
-        for i, idx1 in enumerate(indice):
-            for j, idx2 in enumerate(indice):
-                self.kmat[i, j] = self.innerVars[idx1, idx2]
 
     def __calcInnerVecs__(self):
         innerVecs = calcVecs(self.samples[:, :self._i], includeSelf=True)
@@ -140,28 +135,30 @@ class OK:
         else:
             self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
             self.innerVars = variogram(self.innerVars)
+        if self.innerVars.shape[-1] == 1:
+            self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(points, k=N, eps=0.0)
         properties = np.zeros((len(points)))
         sigmas = np.zeros((len(points)))
-        self.kmat = np.ones((N + 1, N + 1))
-        self.kmat[N, N] = 0.0
-        self.mvec = np.ones((N + 1,))
+        kmat = np.ones((N + 1, N + 1))
+        kmat[N, N] = 0.0
+        mvec = np.ones((N + 1,))
         for idx, indice in enumerate(nbIdx):
-            self.__getKrigeMat__(indice)
+            kmat[:N, :N] = self.innerVars[indice][:, indice]
             if variogram.__class__ == NestVariogram:
-                mvec = self.samples[indice, :self._i] - points[idx]
-                self.mvec[:N] = variogram(mvec)
+                vecs = self.samples[indice, :self._i] - points[idx]
+                mvec[:N] = variogram(vecs)
             else:
-                self.mvec[:N] = variogram(nbd[idx])
-            # np.fill_diagonal(self.kmat,0.0)
+                mvec[:N] = variogram(nbd[idx])
+            # np.fill_diagonal(kmat,0.0)
             try:
-                lambvec = np.linalg.inv(self.kmat).dot(self.mvec)
+                lambvec = np.linalg.inv(kmat).dot(mvec)
             except:
-                lambvec = np.linalg.pinv(self.kmat).dot(self.mvec)
+                lambvec = np.linalg.pinv(kmat).dot(mvec)
             properties[idx] = np.dot(self.samples[indice, self._i], lambvec[:N])
-            sigmas[idx] = np.dot(lambvec, self.mvec)
+            sigmas[idx] = np.dot(lambvec, mvec)
         return properties, sigmas
 
     def crossValidateKFold(self, K=10, N=8, variogram=None):
@@ -201,37 +198,34 @@ class OK:
         else:
             self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
             self.innerVars = variogram(self.innerVars)
+        if self.innerVars.shape[-1] == 1:
+            self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
         properties = np.zeros((len(self.samples)))
-        self.kmat = np.ones((N + 1, N + 1))
-        self.kmat[N, N] = 0.0
-        self.mvec = np.ones((N + 1))
+        kmat = np.ones((N + 1, N + 1))
+        kmat[N, N] = 0.0
+        mvec = np.ones((N + 1,))
         for idx, indice in enumerate(nbIdx):
             indice = indice[1:]
-            self.__getKrigeMat__(indice)
+            kmat[:N, :N] = self.innerVars[indice][:, indice]
             if variogram.__class__ == NestVariogram:
-                mvec = self.samples[indice, :self._i] - self.samples[idx, :self._i]
-                self.mvec[:N] = variogram(mvec)
+                vecs = self.samples[indice, :self._i] - self.samples[idx, :self._i]
+                mvec[:N] = variogram(vecs)
             else:
-                self.mvec[:N] = variogram(nbd[idx][1:])
-            # np.fill_diagonal(self.kmat,0.0)
+                mvec[:N] = variogram(nbd[idx][1:])
+            # np.fill_diagonal(kmat,0.0)
             try:
-                lambvec = np.linalg.inv(self.kmat).dot(self.mvec)
+                lambvec = np.linalg.inv(kmat).dot(mvec)
             except:
-                lambvec = np.linalg.pinv(self.kmat).dot(self.mvec)
+                lambvec = np.linalg.pinv(kmat).dot(mvec)
             properties[idx] = np.dot(self.samples[:, self._i][indice], lambvec[:N])
         error = properties - self.samples[:, self._i]
         absError = np.abs(error)
         mean = absError.mean()
         std = absError.std()
         return mean, std, error
-
-    def __getKrigeMat__(self, indice):
-        for i, idx1 in enumerate(indice):
-            for j, idx2 in enumerate(indice):
-                self.kmat[i, j] = self.innerVars[idx1, idx2]
 
     def __calcInnerVecs__(self):
         innerVecs = calcVecs(self.samples[:, :self._i], includeSelf=True)

@@ -7,6 +7,7 @@ import numpy as np
 from tfinterpy.utils import kSplit, calcVecs
 from tfinterpy.tf.variogramLayer import NestVariogramLayer
 
+# tf.keras.backend.set_floatx('float64')
 
 def SKModel(n=8, variogramLayer=None, vecDim=2):
     kmat = layers.Input(shape=(n, n))
@@ -57,32 +58,37 @@ class TFSK:
         else:
             self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
             self.innerVars = variogramLayer(self.innerVars).numpy()
+        if self.innerVars.shape[-1] == 1:
+            self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
 
         tree = cKDTree(self.samples[:, :self._i])
-        step = batch_size * 2
+        step = batch_size * 3
         num = int(np.ceil(len(points) / step))
         pros = np.empty((0, 1))
         sigmas = np.empty((0, 1))
+        init = False
         for i in range(num):
             begin = i * step
             end = (i + 1) * step
+            if end > len(points):
+                end = len(points)
+            if not init or i == num - 1:
+                kmatArr = np.zeros((end - begin, N, N))
+                if isNest:
+                    mvecArr = np.zeros((end - begin, N, self._i))
+                else:
+                    mvecArr = np.zeros((end - begin, N))
+                neighProArr = np.zeros((end - begin, N))
+                init = True
             points_ = points[begin:end]
             nbd, nbIdx = tree.query(points_, k=N, eps=0.0)
-            kmatList = []
-            mvecList = []
-            neighProList = []
             for idx, indice in enumerate(nbIdx):
-                kmat = self.__getKrigeMat__(indice)
+                kmatArr[idx] = self.innerVars[indice][:, indice]
                 if isNest:
-                    mvec = self.samples[indice, :self._i] - points_[idx]
+                    mvecArr[idx] = self.samples[indice, :self._i] - points_[idx]
                 else:
-                    mvec = nbd[idx]
-                kmatList.append(kmat)
-                mvecList.append(mvec)
-                neighProList.append(self.samples[indice, self._i])
-            kmatArr = np.array(kmatList)
-            mvecArr = np.array(mvecList)
-            neighProArr = np.array(neighProList)
+                    mvecArr[idx] = nbd[idx]
+                neighProArr[idx] = self.samples[indice, self._i]
             pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
             pros = np.append(pros, pro)
             sigmas = np.append(sigmas, sigma)
@@ -127,25 +133,26 @@ class TFSK:
         else:
             self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
             self.innerVars = variogramLayer(self.innerVars).numpy()
+        if self.innerVars.shape[-1] == 1:
+            self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        kmatList = []
-        mvecList = []
-        neighProList = []
+        L = len(self.samples)
+        kmatArr = np.zeros((L, N, N))
+        if isNest:
+            mvecArr = np.zeros((L, N, self._i))
+        else:
+            mvecArr = np.zeros((L, N))
+        neighProArr = np.zeros((L, N))
         for idx, indice in enumerate(nbIdx):
             indice = indice[1:]
-            kmat = self.__getKrigeMat__(indice)
+            kmatArr[idx] = self.innerVars[indice][:, indice]
             if isNest:
-                mvec = self.samples[indice, :self._i] - self.samples[idx, :self._i]
+                mvecArr[idx] = self.samples[indice, :self._i] - self.samples[idx, :self._i]
             else:
-                mvec = nbd[idx][1:]
-            kmatList.append(kmat)
-            mvecList.append(mvec)
-            neighProList.append(self.samples[indice, self._i])
-        kmatArr = np.array(kmatList)
-        mvecArr = np.array(mvecList)
-        neighProArr = np.array(neighProList)
+                mvecArr[idx] = nbd[idx][1:]
+            neighProArr[idx] = self.samples[indice, self._i]
         pros, _ = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=10000)
         pros = pros.reshape(-1)
         error = pros - self.samples[:, self._i]
@@ -154,33 +161,26 @@ class TFSK:
         std = absError.std()
         return mean, std, error
 
-    def __getKrigeMat__(self, indice):
-        kmat = np.zeros((self.N, self.N))
-        for i, idx1 in enumerate(indice):
-            for j, idx2 in enumerate(indice):
-                kmat[i, j] = self.innerVars[idx1, idx2]
-        return kmat
-
     def __calcInnerVecs__(self):
         innerVecs = calcVecs(self.samples[:, :self._i], includeSelf=True)
         self.innerVecs = innerVecs.reshape((self.samples.shape[0], self.samples.shape[0], self._i))
 
 
 def OKModel(n=8, variogramLayer=None, vecDim=2):
-    mat1 = np.ones((n + 1, n + 1), dtype='float32')
+    mat1 = np.ones((n + 1, n + 1))
     mat1[n] = 0
     mat1[:, n] = 0
     mat1 = tf.constant(mat1)
-    mat2 = np.zeros((n + 1, n + 1), dtype='float32')
+    mat2 = np.zeros((n + 1, n + 1))
     mat2[n] = 1
     mat2[:, n] = 1
     mat2[n, n] = 0
     mat2 = tf.constant(mat2)
 
-    mat3 = np.ones((n + 1, 1), dtype='float32')
+    mat3 = np.ones((n + 1, 1))
     mat3[n] = 0
     mat3 = tf.constant(mat3)
-    mat4 = np.zeros((n + 1, 1), dtype='float32')
+    mat4 = np.zeros((n + 1, 1))
     mat4[n] = 1
     mat4 = tf.constant(mat4)
 
@@ -236,36 +236,39 @@ class TFOK:
         else:
             self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
             self.innerVars = variogramLayer(self.innerVars).numpy()
+        if self.innerVars.shape[-1] == 1:
+            self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
 
-        if self.mode.lower() == '2d':
-            addon = np.array([[0.0, 0.0]])
-        else:
-            addon = np.array([[0.0, 0.0, 0.0]])
         tree = cKDTree(self.samples[:, :self._i])
-        step = batch_size * 2
+        step = batch_size * 3
         num = int(np.ceil(len(points) / step))
         pros = np.empty((0, 1))
         sigmas = np.empty((0, 1))
+        init = False
         for i in range(num):
             begin = i * step
             end = (i + 1) * step
+            if end > len(points):
+                end = len(points)
+            if not init or i == num - 1:
+                kmatArr = np.ones((end - begin, N + 1, N + 1))
+                for j in range(end - begin):
+                    kmatArr[j, N, N] = 0.0
+                if isNest:
+                    mvecArr = np.zeros((end - begin, N + 1, self._i))
+                else:
+                    mvecArr = np.ones((end - begin, N + 1))
+                neighProArr = np.zeros((end - begin, N))
+                init = True
             points_ = points[begin:end]
             nbd, nbIdx = tree.query(points_, k=self.N, eps=0.0)
-            kmatList = []
-            mvecList = []
-            neighProList = []
             for idx, indice in enumerate(nbIdx):
-                kmat = self.__getKrigeMat__(indice)
+                kmatArr[idx, :N, :N] = self.innerVars[indice][:, indice]
                 if isNest:
-                    mvec = np.append(self.samples[indice, :self._i] - points_[idx], addon, axis=0)
+                    mvecArr[idx, :N] = self.samples[indice, :self._i] - points_[idx]
                 else:
-                    mvec = np.append(nbd[idx], 1.0)
-                kmatList.append(kmat)
-                mvecList.append(mvec)
-                neighProList.append(self.samples[indice, self._i])
-            kmatArr = np.array(kmatList)
-            mvecArr = np.array(mvecList)
-            neighProArr = np.array(neighProList)
+                    mvecArr[idx, :N] = nbd[idx]
+                neighProArr[idx] = self.samples[indice, self._i]
             pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
             pros = np.append(pros, pro)
             sigmas = np.append(sigmas, sigma)
@@ -310,29 +313,28 @@ class TFOK:
         else:
             self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
             self.innerVars = variogramLayer(self.innerVars).numpy()
+        if self.innerVars.shape[-1] == 1:
+            self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        kmatList = []
-        mvecList = []
-        neighProList = []
-        if self.mode.lower() == '2d':
-            addon = np.array([[0.0, 0.0]])
+        L = len(self.samples)
+        kmatArr = np.ones((L, N + 1, N + 1))
+        for j in range(L):
+            kmatArr[j, N, N] = 0.0
+        if isNest:
+            mvecArr = np.zeros((L, N + 1, self._i))
         else:
-            addon = np.array([[0.0, 0.0, 0.0]])
+            mvecArr = np.ones((L, N + 1))
+        neighProArr = np.zeros((L, N))
         for idx, indice in enumerate(nbIdx):
             indice = indice[1:]
-            kmat = self.__getKrigeMat__(indice)
+            kmatArr[idx, :N, :N] = self.innerVars[indice][:, indice]
             if isNest:
-                mvec = np.append(self.samples[indice, :self._i] - self.samples[idx, :self._i], addon, axis=0)
+                mvecArr[idx, :N] = self.samples[indice, :self._i] - self.samples[idx, :self._i]
             else:
-                mvec = np.append(nbd[idx][1:], 1.0)
-            kmatList.append(kmat)
-            mvecList.append(mvec)
-            neighProList.append(self.samples[indice, self._i])
-        kmatArr = np.array(kmatList)
-        mvecArr = np.array(mvecList)
-        neighProArr = np.array(neighProList)
+                mvecArr[idx, :N] = nbd[idx][1:]
+            neighProArr[idx] = self.samples[indice, self._i]
         pros, _ = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=10000)
         pros = pros.reshape(-1)
         error = pros - self.samples[:, self._i]
@@ -340,14 +342,6 @@ class TFOK:
         mean = absError.mean()
         std = absError.std()
         return mean, std, error
-
-    def __getKrigeMat__(self, indice):
-        kmat = np.ones((self.N + 1, self.N + 1))
-        kmat[self.N, self.N] = 0
-        for i, idx1 in enumerate(indice):
-            for j, idx2 in enumerate(indice):
-                kmat[i, j] = self.innerVars[idx1, idx2]
-        return kmat
 
     def __calcInnerVecs__(self):
         innerVecs = calcVecs(self.samples[:, :self._i], includeSelf=True)
