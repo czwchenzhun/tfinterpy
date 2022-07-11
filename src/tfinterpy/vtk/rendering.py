@@ -6,6 +6,18 @@ import tfinterpy.vtk.colorMap as CM
 import numpy as np
 
 def createPointsActor(x,y,z=0,scalar=None,scalarRange=None,colorMap=CM.BlueGreenOrange):
+    '''
+    Create vertices representing coordinate points based on the coordinate data.
+
+    :param x: array_like, x coordinate data.
+    :param y: array_like, y coordinate data.
+    :param z: array_like, z coordinate data.
+        If it is a two-dimensional space, z should be set to 0.
+    :param scalar: array_like, properties.
+    :param scalarRange: array_like, [scalarMin, scalarMax], properties' range.
+    :param colorMap: list, refer to the colorMap in the vtk.colorMap module.
+    :return: vtkActor object.
+    '''
     points = vtk.vtkPoints()
     L=len(x)
     points.SetNumberOfPoints(L)
@@ -45,6 +57,20 @@ def createPointsActor(x,y,z=0,scalar=None,scalarRange=None,colorMap=CM.BlueGreen
     return actor
 
 def createGridActor(nx,ny,nz,x,y,z,scalar=None,scalarRange=None,colorMap=CM.Rainbow):
+    '''
+    Create rectilinear grid based on the coordinate data.
+
+    :param nx: integer, number of x coordinate.
+    :param ny: integer, number of y coordinate.
+    :param nz: integer, number of z coordinate.
+    :param x: array_like, x coordinate data.
+    :param y: array_like, y coordinate data.
+    :param z: array_like, z coordinate data.
+    :param scalar: array_like, properties.
+    :param scalarRange: array_like, [scalarMin, scalarMax], properties' range.
+    :param colorMap: list, refer to the colorMap in the vtk.colorMap module.
+    :return: vtkActor object.
+    '''
     rgrid = vtk.vtkRectilinearGrid()
     nz=1 if nz<=1 else nz
     z=[0] if nz==1 else z
@@ -93,6 +119,12 @@ def createGridActor(nx,ny,nz,x,y,z,scalar=None,scalarRange=None,colorMap=CM.Rain
     return actor
 
 def rendering(actor):
+    '''
+    Create a new render window to render the actor.
+
+    :param actor: vtkActor object.
+    :return: None.
+    '''
     ren = vtk.vtkRenderer()
     ren.AddActor(actor)
     renWin = vtk.vtkRenderWindow()

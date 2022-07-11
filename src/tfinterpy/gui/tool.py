@@ -26,7 +26,7 @@ from tfinterpy.vtk.fileUtils import saveVTKPoints, saveVTKGrid
 from scipy.optimize import least_squares
 import time
 
-ColorMap = colorMap.Rainbow
+ColorMap = colorMap.Rainbow #default color map
 
 
 class Tool(QMainWindow, Ui_MainWindow):
@@ -166,7 +166,7 @@ class Tool(QMainWindow, Ui_MainWindow):
         self.cols = cols
 
     def onCalcVariogramClicked(self):
-        self.statusBar.showMessage("Processing...",10000)
+        self.statusBar.showMessage("Processing...",10000)#show message in  status bar, duration time set to 10s.
         begin=time.perf_counter()
         self.setupSamples()
         if self.samples is None:

@@ -27,6 +27,14 @@ BlueGreenOrange=[
 ]
 
 def getCTF(scalarMin,scalarMax,stops):
+    '''
+    Get vtk color transfer function by scalarRange and stops.
+
+    :param scalarMin: number.
+    :param scalarMax: number.
+    :param stops: list, each stop represented by [percentage,[r,g,b]].
+    :return: vtkDiscretizableColorTransferFunction object.
+    '''
     ctf=vtk.vtkDiscretizableColorTransferFunction()
     total=scalarMax-scalarMin
 

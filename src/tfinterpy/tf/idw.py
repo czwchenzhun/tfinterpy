@@ -1,4 +1,4 @@
-import keras.backend as K
+import tensorflow.keras.backend as K
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
 from scipy.spatial import cKDTree
@@ -7,6 +7,13 @@ from tfinterpy.utils import kSplit
 
 
 def IDWModel(n=8, alpha=2):
+    '''
+    Construction a keras model for Inverse Distance Weighted algorithm.
+
+    :param n: integer, neighborhood size.
+    :param alpha: number, distance power factor.
+    :return: keras' Model object.
+    '''
     h_ = layers.Input(shape=(n))
     pro = layers.Input(shape=(n))
     h = h_ ** alpha
@@ -20,7 +27,19 @@ def IDWModel(n=8, alpha=2):
 
 
 class TFIDW:
+    '''
+    Tensorflow version of Inverse Distance Weighted interpolator.
+    '''
+
     def __init__(self, samples, mode='2d'):
+        '''
+        Initialize the interpolator using sample points.
+
+        :param samples: ndarray, array containing all sample points. The last column must be the properties.
+            For the case of two-dimensional interpolation, where each item is represented by [x,y,property].
+            For the case of three-dimensional interpolation, where each item is represented by [x,y,z,property].
+        :param mode: str, '2d' or '3d'.
+        '''
         self.samples = samples
         self.mode = mode
         self._i = 2
@@ -28,6 +47,15 @@ class TFIDW:
             self._i = 3
 
     def execute(self, points, N=8, alpha=2, batch_size=1000):
+        '''
+        Perform interpolation for points and return result values.
+
+        :param points: ndarray, array containing all the coordinate points to be interpolated.
+        :param N: integer, neighborhood size.
+        :param alpha: number, distance power factor.
+        :param batch_size: integer, size of each batch of data to be calculated.
+        :return: ndarray, one-dimensional array containing interpolation result.
+        '''
         self.model = IDWModel(N, alpha)
         tree = cKDTree(self.samples[:, :self._i])
         step = batch_size * 2
@@ -50,6 +78,17 @@ class TFIDW:
         return pros
 
     def crossValidateKFold(self, K=10, N=8, alpha=2):
+        '''
+        Perform k-fold cross validation on sample points.
+
+        :param K: integer.
+        :param N: integer, neighborhood size.
+        :param alpha: number, distance power factor.
+        :return: tuple, tuple containing three list.
+            The first list contains the absolute mean error for each fold,
+            the second list contains the absolute standard deviation error for each fold,
+            the last list contains the origin error for each fold.
+        '''
         splits = kSplit(self.samples, K)
         absErrorMeans = []
         absErrorStds = []
@@ -76,6 +115,13 @@ class TFIDW:
         return absErrorMeans, absErrorStds, originalErrorList
 
     def crossValidate(self, N=8, alpha=2):
+        '''
+        Perform leave-one-out cross validation on sample points.
+
+        :param N: integer, neighborhood size.
+        :param alpha: number, distance power factor.
+        :return: tuple, tuple containing absolute mean error, absolute standard deviation error and origin error(ndarray).
+        '''
         self.model = IDWModel(N, alpha)
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nb_idx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)

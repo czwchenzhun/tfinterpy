@@ -8,8 +8,12 @@ if __name__ == "__main__":
     W, H = 200, 200
     M = 100
     offset = (100, 100)
+
+    # Get sample points and original elevation data from netcdf file
+    # containing Digital Elevation Model data.
     samples, lats, lons, ele = getSamples(filePath, 'lat', 'lon', 'Band1', offset, (W, H), M)
 
+    # Calculate the nested variogram function.
     nestVariogram, variogramBuilders = calculateOmnidirectionalVariogram2D(samples)
     for vb in variogramBuilders:
         plt.figure()

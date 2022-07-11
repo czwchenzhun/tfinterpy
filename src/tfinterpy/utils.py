@@ -2,15 +2,47 @@ import numpy as np
 
 
 def h2(p1, p2):
+    '''
+    Return the square of distance between p1 and p2.
+    p1 and p2 can be either a one-dimensional array representing a single
+    coordinate point or an ndarray containing multiple coordinate points.
+    The shapes of p1 and p2 should be the same.
+
+    :param p1: array_like.
+    :param p2: array_like.
+    :return: ndarray.
+    '''
     diff = np.square(np.subtract(p1, p2))
     return np.sum(diff, axis=-1)
 
 
 def h(p1, p2):
+    '''
+    Return the distance between p1 and p2.
+    p1 and p2 can be either a one-dimensional array representing a single
+    coordinate point or an ndarray containing multiple coordinate points.
+    The shapes of p1 and p2 should be the same.
+
+    :param p1: array_like.
+    :param p2: array_like.
+    :return: ndarray.
+    '''
     return np.sqrt(h2(p1, p2))
 
 
 def ha(p1, p2):
+    '''
+    Return the distance and angele between p1 and p2.
+    p1 and p2 can be either a one-dimensional array representing a single
+    coordinate point or an ndarray containing multiple coordinate points.
+    The shapes of p1 and p2 should be the same.
+
+    :param p1: array_like.
+    :param p2: array_like.
+    :return: tuple, tuple containing two ndarray.
+        The first ndarray representing the distance,
+        the second list representing the angle, the angle range is [0,PI].
+    '''
     diff = np.subtract(p1, p2)
     h = np.sqrt(np.sum(np.square(diff), axis=-1))
     if diff.ndim == 1:
@@ -23,6 +55,14 @@ def ha(p1, p2):
 
 
 def calcHV(data, dim=2, attrib_col=2):
+    '''
+    Calculates the distance and variation between data.
+
+    :param data: ndarray, array containing coordinates and attributes.
+    :param dim: integer, indicates whether the coordinates are 2d or 3d.
+    :param attrib_col: integer, indicates which column is property.
+    :return: ndarray, the first column is distance, the second column is variation.
+    '''
     if dim == 3 and attrib_col < 3:
         attrib_col = 3
     arr = np.empty((0, 2), dtype="float32")
@@ -37,6 +77,15 @@ def calcHV(data, dim=2, attrib_col=2):
 
 
 def calcHAV(data, attrib_col=2):
+    '''
+    Calculates the distance, angle and variation between data.
+
+    :param data: ndarray, array containing coordinates and attributes.
+    :param attrib_col: integer, indicates which column is property.
+    :return: ndarray, the first column is distance,
+        the second column is angle (range is [0, PI]),
+        the third column is variation.
+    '''
     dim = 2
     if attrib_col < 2:
         attrib_col = 2
@@ -53,6 +102,14 @@ def calcHAV(data, attrib_col=2):
 
 
 def calcHAVByVecs(vecs):
+    '''
+    Calculates the distance, angle and variation according to vectors.
+
+    :param vecs: ndarray, vectors containing 2d coordinates' difference and properties' difference.
+    :return: ndarray, the first column is distance,
+        the second column is angle (range is [0, PI]),
+        the third column is variation.
+    '''
     distance = np.linalg.norm(vecs[:, :2], axis=1)
     angle = np.arctan2(vecs[:, 1], vecs[:, 0])
     angle[angle < 0] += np.pi
@@ -65,6 +122,15 @@ def calcHAVByVecs(vecs):
 
 
 def calcHABVByVecs(vecs):
+    '''
+    Calculates the distance, azimuth(alpha), dip(beta) and variation according to vectors.
+
+    :param vecs: ndarray, vectors containing 3d coordinates' difference and properties' difference.
+    :return: ndarray, the first column is distance,
+        the second column is azimuth(alpha) (range is [0, PI]),
+        the second column is dip(beta) (range is [0, PI]),
+        the fourth column is variation.
+    '''
     distance = np.linalg.norm(vecs[:, :3], axis=1)
     azimuth = np.arctan2(vecs[:, 1], vecs[:, 0])
     azimuth[azimuth < 0] += np.pi
@@ -81,6 +147,14 @@ def calcHABVByVecs(vecs):
 
 
 def calcVecs(data, includeSelf=False, repeat=True):
+    '''
+    Compute vectors between data.
+
+    :param data: ndarray, two-dimensional array.
+    :param includeSelf: boolean, whether to subtract the vector from itself.
+    :param repeat: boolean, whether to calculate the two points that have subtracted from each other.
+    :return: ndarray, vectors.
+    '''
     L = len(data)
     if repeat:
         vecs = []
@@ -106,6 +180,13 @@ def calcVecs(data, includeSelf=False, repeat=True):
 
 
 def kSplit(ndarray, k):
+    '''
+    Split the ndarray into k fold.
+
+    :param ndarray: ndarray.
+    :param k: integer, fold number.
+    :return: list, list containing all fold.
+    '''
     size = ndarray.shape[0]
     step = size // k
     if size % k != 0:

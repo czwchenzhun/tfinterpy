@@ -5,6 +5,17 @@ plt.rcParams['axes.unicode_minus'] = False
 
 
 def img2d(data, xlabel="lons", ylabel="lats", title="", vmin=None, vmax=None):
+    '''
+    Plotting 2d data as image.
+
+    :param data: ndarray, 2d data.
+    :param xlabel: str.
+    :param ylabel: str.
+    :param title: str.
+    :param vmin: number.
+    :param vmax: number.
+    :return: None.
+    '''
     if title != "":
         plt.title(title)
     plt.imshow(data, cmap="rainbow", vmin=vmin, vmax=vmax)
@@ -17,6 +28,19 @@ def img2d(data, xlabel="lons", ylabel="lats", title="", vmin=None, vmax=None):
 
 
 def scatter2d(data, xidx=0, yidx=1, zidx=-1, axes=None, xlabel="lons", ylabel="lats", title=""):
+    '''
+    Plotting 2d scatter.
+
+    :param data: ndarray, points data.
+    :param xidx: integer, index of x coordinate.
+    :param yidx: integer, index of y coordinate.
+    :param zidx: integer, index of property.
+    :param axes: matplotlib axes.
+    :param xlabel: str.
+    :param ylabel: str.
+    :param title: str.
+    :return: matplotlib.collections.PathCollection object.
+    '''
     if title != "":
         plt.title(title)
     if axes is None:
@@ -38,6 +62,18 @@ def scatter2d(data, xidx=0, yidx=1, zidx=-1, axes=None, xlabel="lons", ylabel="l
 
 
 def scatter3d(data, axes=None, xlabel='h', ylabel='angle', zlabel='var', alpha=0.5, title=""):
+    '''
+    Plotting 3d scatter.
+
+    :param data: ndarray, points data.
+    :param axes: matplotlib axes.
+    :param xlabel: str.
+    :param ylabel: str.
+    :param zlabel: str.
+    :param alpha: number.
+    :param title: str.
+    :return: matplotlib.axes._subplots.Axes3DSubplot object.
+    '''
     if title != "":
         plt.title(title)
     if axes is None:

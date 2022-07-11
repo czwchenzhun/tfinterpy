@@ -1,5 +1,5 @@
 import tensorflow as tf
-import keras.backend as K
+import tensorflow.keras.backend as K
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
 from scipy.spatial import cKDTree
@@ -10,6 +10,14 @@ from tfinterpy.tf.variogramLayer import NestVariogramLayer
 # tf.keras.backend.set_floatx('float64')
 
 def SKModel(n=8, variogramLayer=None, vecDim=2):
+    '''
+    Construction a keras model for Simple Kriging algorithm.
+
+    :param n: integer, neighborhood size.
+    :param variogramLayer: keras' layer, layer representing a variogram function.
+    :param vecDim: integer, the dimension of the vector to be calculated.
+    :return: keras' Model object.
+    '''
     kmat = layers.Input(shape=(n, n))
     if variogramLayer != None and variogramLayer.__class__ == NestVariogramLayer:
         mvec_ = layers.Input(shape=(n, vecDim))
@@ -37,7 +45,19 @@ def SKModel(n=8, variogramLayer=None, vecDim=2):
 
 
 class TFSK:
+    '''
+    Tensorflow version of Simple Kriging interpolator.
+    '''
+
     def __init__(self, samples, mode='2d'):
+        '''
+        Initialize the interpolator using sample points.
+
+        :param samples: ndarray, array containing all sample points. The last column must be the properties.
+            For the case of two-dimensional interpolation, where each item is represented by [x,y,property].
+            For the case of three-dimensional interpolation, where each item is represented by [x,y,z,property].
+        :param mode: str, '2d' or '3d'.
+        '''
         self.samples = samples
         self.mode = mode
         self._i = 2
@@ -46,6 +66,17 @@ class TFSK:
         self.innerVecs = None
 
     def execute(self, points, N=8, variogramLayer=None, batch_size=10000):
+        '''
+        Perform interpolation for points and return result values.
+
+        :param points: ndarray, array containing all the coordinate points to be interpolated.
+        :param N: integer, neighborhood size.
+        :param variogramLayer: keras' layer, layer representing a variogram function.
+        :param batch_size: integer, size of each batch of data to be calculated.
+        :return: tuple, tuple containing tow ndarray.
+            The first ndarray representing the interpolation result,
+            the second ndarray representing the kriging variance.
+        '''
         self.N = N
         self.model = SKModel(N, variogramLayer, self._i)
         isNest = variogramLayer.__class__ == NestVariogramLayer
@@ -95,6 +126,17 @@ class TFSK:
         return pros, sigmas
 
     def crossValidateKFold(self, K=10, N=8, variogramLayer=None):
+        '''
+        Perform k-fold cross validation on sample points.
+
+        :param K: integer.
+        :param N: integer, neighborhood size.
+        :param variogramLayer: keras' layer, layer representing a variogram function.
+        :return: tuple, tuple containing three list.
+            The first list contains the absolute mean error for each fold,
+            the second list contains the absolute standard deviation error for each fold,
+            the last list contains the origin error for each fold.
+        '''
         splits = kSplit(self.samples, K)
         absErrorMeans = []
         absErrorStds = []
@@ -121,6 +163,13 @@ class TFSK:
         return absErrorMeans, absErrorStds, originalErrorList
 
     def crossValidate(self, N=8, variogramLayer=None):
+        '''
+        Perform leave-one-out cross validation on sample points.
+
+        :param N: integer, neighborhood size.
+        :param variogramLayer: keras' layer, layer representing a variogram function.
+        :return: tuple, tuple containing absolute mean error, absolute standard deviation error and origin error(ndarray).
+        '''
         self.N = N
         self.model = SKModel(N, variogramLayer, self._i)
         isNest = variogramLayer.__class__ == NestVariogramLayer
@@ -162,11 +211,24 @@ class TFSK:
         return mean, std, error
 
     def __calcInnerVecs__(self):
+        '''
+        Compute vectors between sample points.
+
+        :return: None.
+        '''
         innerVecs = calcVecs(self.samples[:, :self._i], includeSelf=True)
         self.innerVecs = innerVecs.reshape((self.samples.shape[0], self.samples.shape[0], self._i))
 
 
 def OKModel(n=8, variogramLayer=None, vecDim=2):
+    '''
+    Construction a keras model for Ordinary Kriging algorithm.
+
+    :param n: integer, neighborhood size.
+    :param variogramLayer: keras' layer, layer representing a variogram function.
+    :param vecDim: integer, the dimension of the vector to be calculated.
+    :return: keras' Model object.
+    '''
     mat1 = np.ones((n + 1, n + 1))
     mat1[n] = 0
     mat1[:, n] = 0
@@ -215,7 +277,19 @@ def OKModel(n=8, variogramLayer=None, vecDim=2):
 
 
 class TFOK:
+    '''
+    Tensorflow version of Ordinary Kriging interpolator.
+    '''
+
     def __init__(self, samples, mode='2d'):
+        '''
+        Initialize the interpolator using sample points.
+
+        :param samples: ndarray, array containing all sample points. The last column must be the properties.
+            For the case of two-dimensional interpolation, where each item is represented by [x,y,property].
+            For the case of three-dimensional interpolation, where each item is represented by [x,y,z,property].
+        :param mode: str, '2d' or '3d'.
+        '''
         self.samples = samples
         self.mode = mode
         self._i = 2
@@ -224,6 +298,17 @@ class TFOK:
         self.innerVecs = None
 
     def execute(self, points, N=8, variogramLayer=None, batch_size=10000):
+        '''
+        Perform interpolation for points and return result values.
+
+        :param points: ndarray, array containing all the coordinate points to be interpolated.
+        :param N: integer, neighborhood size.
+        :param variogramLayer: keras' layer, layer representing a variogram function.
+        :param batch_size: integer, size of each batch of data to be calculated.
+        :return: tuple, tuple containing tow ndarray.
+            The first ndarray representing the interpolation result,
+            the second ndarray representing the kriging variance.
+        '''
         self.N = N
         self.model = OKModel(N, variogramLayer, self._i)
         isNest = variogramLayer.__class__ == NestVariogramLayer
@@ -275,6 +360,17 @@ class TFOK:
         return pros, sigmas
 
     def crossValidateKFold(self, K=10, N=8, variogramLayer=None):
+        '''
+        Perform k-fold cross validation on sample points.
+
+        :param K: integer.
+        :param N: integer, neighborhood size.
+        :param variogramLayer: keras' layer, layer representing a variogram function.
+        :return: tuple, tuple containing three list.
+            The first list contains the absolute mean error for each fold,
+            the second list contains the absolute standard deviation error for each fold,
+            the last list contains the origin error for each fold.
+        '''
         splits = kSplit(self.samples, K)
         absErrorMeans = []
         absErrorStds = []
@@ -301,6 +397,13 @@ class TFOK:
         return absErrorMeans, absErrorStds, originalErrorList
 
     def crossValidate(self, N=8, variogramLayer=None):
+        '''
+        Perform leave-one-out cross validation on sample points.
+
+        :param N: integer, neighborhood size.
+        :param variogramLayer: keras' layer, layer representing a variogram function.
+        :return: tuple, tuple containing absolute mean error, absolute standard deviation error and origin error(ndarray).
+        '''
         self.N = N
         self.model = OKModel(N, variogramLayer, self._i)
         isNest = variogramLayer.__class__ == NestVariogramLayer
@@ -344,5 +447,10 @@ class TFOK:
         return mean, std, error
 
     def __calcInnerVecs__(self):
+        '''
+        Compute vectors between sample points.
+
+        :return: None.
+        '''
         innerVecs = calcVecs(self.samples[:, :self._i], includeSelf=True)
         self.innerVecs = innerVecs.reshape((self.samples.shape[0], self.samples.shape[0], self._i))

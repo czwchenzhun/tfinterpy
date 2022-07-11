@@ -5,7 +5,19 @@ from tfinterpy.variogram import NestVariogram
 
 
 class SK:
+    '''
+    Simple Kriging interpolator.
+    '''
+
     def __init__(self, samples, mode="2d"):
+        '''
+        Initialize the interpolator using sample points.
+
+        :param samples: ndarray, array containing all sample points. The last column must be the properties.
+            For the case of two-dimensional interpolation, where each item is represented by [x,y,property].
+            For the case of three-dimensional interpolation, where each item is represented by [x,y,z,property].
+        :param mode: str, '2d' or '3d'.
+        '''
         self.samples = samples
         self.mode = mode
         self._i = 2
@@ -14,6 +26,17 @@ class SK:
         self.innerVecs = None
 
     def execute(self, points, N=8, variogram=None):
+        '''
+        Perform interpolation for points and return result values.
+
+        :param points: ndarray, array containing all the coordinate points to be interpolated.
+        :param N: integer, neighborhood size.
+        :param variogram: variogram function or nest variogram object, default None.
+            A linear variogram (lambda x:x) is used when the variogram is None.
+        :return: tuple, tuple containing tow ndarray.
+            The first ndarray representing the interpolation result,
+            the second ndarray representing the kriging variance.
+        '''
         if self.innerVecs is None:
             self.__calcInnerVecs__()
         if variogram is None:
@@ -48,6 +71,18 @@ class SK:
         return properties, sigmas
 
     def crossValidateKFold(self, K=10, N=8, variogram=None):
+        '''
+        Perform k-fold cross validation on sample points.
+
+        :param K: integer.
+        :param N: integer, neighborhood size.
+        :param variogram: variogram function or nest variogram object, default None.
+            A linear variogram (lambda x:x) is used when the variogram is None.
+        :return: tuple, tuple containing three list.
+            The first list contains the absolute mean error for each fold,
+            the second list contains the absolute standard deviation error for each fold,
+            the last list contains the origin error for each fold.
+        '''
         splits = kSplit(self.samples, K)
         absErrorMeans = []
         absErrorStds = []
@@ -74,6 +109,14 @@ class SK:
         return absErrorMeans, absErrorStds, originalErrorList
 
     def crossValidate(self, N=8, variogram=None):
+        '''
+        Perform leave-one-out cross validation on sample points.
+
+        :param N: integer, neighborhood size.
+        :param variogram: variogram function or nest variogram object, default None.
+            A linear variogram (lambda x:x) is used when the variogram is None.
+        :return: tuple, tuple containing absolute mean error, absolute standard deviation error and origin error(ndarray).
+        '''
         if self.innerVecs is None:
             self.__calcInnerVecs__()
         if variogram is None:
@@ -111,12 +154,29 @@ class SK:
         return mean, std, error
 
     def __calcInnerVecs__(self):
+        '''
+        Compute vectors between sample points.
+
+        :return: None.
+        '''
         innerVecs = calcVecs(self.samples[:, :self._i], includeSelf=True)
         self.innerVecs = innerVecs.reshape((self.samples.shape[0], self.samples.shape[0], self._i))
 
 
 class OK:
+    '''
+    Ordinary Kriging interpolator.
+    '''
+
     def __init__(self, samples, mode="2d"):
+        '''
+        Initialize the interpolator using sample points.
+
+        :param samples: ndarray, array containing all sample points. The last column must be the properties.
+            For the case of two-dimensional interpolation, where each item is represented by [x,y,property].
+            For the case of three-dimensional interpolation, where each item is represented by [x,y,z,property].
+        :param mode: str, '2d' or '3d'.
+        '''
         self.samples = samples
         self.mode = mode
         self._i = 2
@@ -125,6 +185,17 @@ class OK:
         self.innerVecs = None
 
     def execute(self, points, N=8, variogram=None):
+        '''
+        Perform interpolation for points and return result values.
+
+        :param points: ndarray, array containing all the coordinate points to be interpolated.
+        :param N: integer, neighborhood size.
+        :param variogram: variogram function or nest variogram object, default None.
+            A linear variogram (lambda x:x) is used when the variogram is None.
+        :return: tuple, tuple containing tow ndarray.
+            The first ndarray representing the interpolation result,
+            the second ndarray representing the kriging variance.
+        '''
         if self.innerVecs is None:
             self.__calcInnerVecs__()
         if variogram is None:
@@ -162,6 +233,18 @@ class OK:
         return properties, sigmas
 
     def crossValidateKFold(self, K=10, N=8, variogram=None):
+        '''
+        Perform k-fold cross validation on sample points.
+
+        :param K: integer.
+        :param N: integer, neighborhood size.
+        :param variogram: variogram function or nest variogram object, default None.
+            A linear variogram (lambda x:x) is used when the variogram is None.
+        :return: tuple, tuple containing three list.
+            The first list contains the absolute mean error for each fold,
+            the second list contains the absolute standard deviation error for each fold,
+            the last list contains the origin error for each fold.
+        '''
         splits = kSplit(self.samples, K)
         absErrorMeans = []
         absErrorStds = []
@@ -188,6 +271,14 @@ class OK:
         return absErrorMeans, absErrorStds, originalErrorList
 
     def crossValidate(self, N=8, variogram=None):
+        '''
+        Perform leave-one-out cross validation on sample points.
+
+        :param N: integer, neighborhood size.
+        :param variogram: variogram function or nest variogram object, default None.
+            A linear variogram (lambda x:x) is used when the variogram is None.
+        :return: tuple, tuple containing absolute mean error, absolute standard deviation error and origin error(ndarray).
+        '''
         if self.innerVecs is None:
             self.__calcInnerVecs__()
         if variogram is None:
@@ -228,5 +319,10 @@ class OK:
         return mean, std, error
 
     def __calcInnerVecs__(self):
+        '''
+        Compute vectors between sample points.
+
+        :return: None.
+        '''
         innerVecs = calcVecs(self.samples[:, :self._i], includeSelf=True)
         self.innerVecs = innerVecs.reshape((self.samples.shape[0], self.samples.shape[0], self._i))

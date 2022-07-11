@@ -3,13 +3,33 @@ from tfinterpy.variogramExp import search2d, search3d
 from tfinterpy.variogramModel import variogramModel, VariogramModelMap
 from scipy.optimize import least_squares
 
+EPS = 1e-16
 
 def resident(params, x, y, variogram_function):
+    '''
+    This function is used to calculate resident.
+
+    :param params: tuple, represents the parameters passed to the variogram function.
+    :param x: number or ndarray, distance.
+    :param y: number or ndarray, semivariance.
+    :param variogram_function: function, variogram function.
+    :return: number or ndarray, resident=( variogram(x,params[0],...,params[n])-y )^2
+    '''
     error = variogram_function(x, *params) - y
     return error ** 2
 
 
 def getX0AndBnds(h, y, variogram_model):
+    '''
+    Calculate the initial value and range of parameters(nugget, sill, range, ...)
+    according to the variogram function model.
+
+    :param h: array_like, distance.
+    :param y: array_like, semivariance.
+    :param variogram_model: str, indicates the variogram function model.
+    :return: tuple, (x0,bnds). x0 represents the initial value of the parameters,
+        and bnds represents the range of the parameters.
+    '''
     if variogram_model == "linear":
         x0 = [(np.amax(y) - np.amin(y)) / 2 / (np.amax(h) - np.amin(h)), np.amin(y)]
         bnds = ([0.0, 0.0], [np.inf, np.amax(y)])
@@ -23,7 +43,17 @@ def getX0AndBnds(h, y, variogram_model):
 
 
 class VariogramBuilder:
+    '''
+    VariogramBuilder class is used to build variogram function.
+    '''
+
     def __init__(self, lags, model="spherical"):
+        '''
+        The VariogramBuilder is constructed with lags and string indicating the model.
+
+        :param lags: array_like, a lag is [distance,semivariance].
+        :param model: str, indicates the variogram function model.
+        '''
         self.model = model
         self.lags = np.array(lags)
         x0, bnds = getX0AndBnds(self.lags[:, 0], self.lags[:, 1], model)
@@ -33,6 +63,12 @@ class VariogramBuilder:
         self.mae = np.mean(res.fun)
 
     def showVariogram(self, axes=None):
+        '''
+        Plot variogram.
+
+        :param axes: axes, if axes is set to None, plot on a new axes.
+        :return: None.
+        '''
         if axes is None:
             import matplotlib.pyplot as axes
         variogram = self.getVariogram()
@@ -43,18 +79,40 @@ class VariogramBuilder:
         axes.plot(X, Y, alpha=0.5, color="red", label=self.model)
 
     def getVariogram(self):
+        '''
+        Get variogram function(closure function).
+        :return: function.
+        '''
         def variogram(h):
             return variogramModel(self.model)(h, *self.params)
-
         return variogram
 
 
 class NestVariogram:
+    '''
+    NestVariogram class is used to calculate the nesting variogram function value.
+    A NestVariogram object is a functor.
+    '''
+
     def __init__(self, variograms, unitVectors):
+        '''
+        The nested variational function object is constructed by
+        using a number of unit vectors and variograms calculated
+        from different directions.
+
+        :param variograms: list, variogram functions.
+        :param unitVectors: array_like, unit vectors corresponding to the direction.
+        '''
         self.variograms = variograms
         self.unitVectors = unitVectors
 
     def __call__(self, vec):
+        '''
+        Calculate the value of the nesting variogram function.
+
+        :param vec: array_like, vectors.
+        :return: array_like, variogram function value.
+        '''
         totalVar = 0
         for idx, unitVector in enumerate(self.unitVectors):
             h = np.abs(np.dot(vec, unitVector))
@@ -65,6 +123,32 @@ class NestVariogram:
 
 def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10, lagNum=20, lagInterval=None,
                                         lagTole=None, bandWidth=None, model=None):
+    '''
+    Calculating the omnidirectional variogram in two dimensions.
+
+    :param samples: ndarray, array containing all sample points. The last column must be the properties.
+        Each item is represented by [x,y,property].
+
+    :param partitionNum: integer, indicates how many parts the angle range is divided into.
+    :param leastPairNum: integer, at least lastPairNum lags need to be searched
+        in one direction to fit the variogram function.
+    :param lagNum: integer, number of lags to search.
+    :param lagInterval: number, interval lags' distance.
+        If lagInterval is set to None, then it is set to 0.75 times.
+        the maximum vector modulus length divided by lagNum.
+    :param lagTole: number, tolerance of lag's distance.
+        If lagTole is set to None, then it is set to lagInterval/2.
+    :param bandWidth: number, bandwidth used during search.
+        If bandWidth is set to None, then it is set to the mean
+        of the vector modulus length divided by 2.
+    :param model: str, specify which variogram function model to use for the fit.
+        If model is set to None, fitting will be attempted using all the variogram
+        function models in the variogramModel module, and the best fit will be used.
+    :return: tuple, (NestVariogram,variogramBuilders).
+        NestVariogram is NestVariogram object,
+        variogramBuilders is a list of VariogramBuilder objects corresponding to
+        all variogram functions maintained within the NestVariogram object.
+    '''
     vecs = calcVecs(samples, repeat=False)
     vars = 0.5 * vecs[:, 2] ** 2
     vecs = vecs[:, :2]
@@ -77,7 +161,7 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
         unitVectors.append([np.cos(azimuth), np.sin(azimuth)])
     unitVectors = np.array(unitVectors)
     azimuths = np.array(azimuths)
-    norms = np.linalg.norm(vecs, axis=1)
+    norms = np.linalg.norm(vecs, axis=1) + EPS
     if bandWidth is None:
         bandWidth = norms.mean() / 2
     if lagInterval is None:
@@ -138,6 +222,31 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
 
 def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairNum=10, lagNum=20, lagInterval=None,
                                         lagTole=None, bandWidth=None, model=None):
+    '''
+    Calculating the omnidirectional variogram in three dimensions.
+
+    :param samples: ndarray, array containing all sample points. The last column must be the properties.
+        Each item is represented by [x,y,z,property].
+    :param partitionNum: array_like,Indicates how many parts the angle range
+        in horizontal and vertical directions is divided into.
+    :param leastPairNum: integer, at least lastPairNum lags need to be searched
+        in one direction to fit the variogram function.
+    :param lagNum: integer, number of lags to search.
+    :param lagInterval: number, interval lags' distance.
+        If lagInterval is set to None, then it is set to 0.75 times.
+    :param lagTole: number, tolerance of lag's distance.
+        If lagTole is set to None, then it is set to lagInterval/2.
+    :param bandWidth: number, bandwidth used during search.
+        If bandWidth is set to None, then it is set to the mean
+        of the vector modulus length divided by 2.
+    :param model: str, specify which variogram function model to use for the fit.
+        If model is set to None, fitting will be attempted using all the variogram
+        function models in the variogramModel module, and the best fit will be used.
+    :return: tuple, (NestVariogram,variogramBuilders).
+        NestVariogram is NestVariogram object,
+        variogramBuilders is a list of VariogramBuilder objects corresponding to
+        all variogram functions maintained within the NestVariogram object.
+    '''
     vecs = calcVecs(samples, repeat=False)
     vars = 0.5 * vecs[:, 3] ** 2
     vecs = vecs[:, :3]
@@ -156,7 +265,7 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
     unitVectors = np.array(unitVectors)
     azimuths = np.array(azimuths)
     dips = np.array(dips)
-    norms = np.linalg.norm(vecs, axis=1)
+    norms = np.linalg.norm(vecs, axis=1) + EPS
     if bandWidth is None:
         bandWidth = norms.mean() / 2
     if lagInterval is None:
@@ -228,6 +337,15 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
 
 
 def calculateDefaultVariogram2D(samples, model='spherical'):
+    '''
+    Calculate the default variogram function in two dimensions,
+    without considering the effect of direction.
+
+    :param samples: ndarray, array containing all sample points. The last column must be the properties.
+        Each item is represented by [x,y,property].
+    :param model: str, specify which variogram function model to use for the fit.
+    :return: VariogramBuilder object.
+    '''
     vecs = calcVecs(samples, repeat=False)
     hav = calcHAVByVecs(vecs)
     lagNum = 20
@@ -252,6 +370,15 @@ def calculateDefaultVariogram2D(samples, model='spherical'):
 
 
 def calculateDefaultVariogram3D(samples, model='spherical'):
+    '''
+    Calculate the default variogram function in three dimensions,
+    without considering the effect of direction.
+
+    :param samples: ndarray, array containing all sample points. The last column must be the properties.
+        Each item is represented by [x,y,z,property].
+    :param model: str, specify which variogram function model to use for the fit.
+    :return: VariogramBuilder object.
+    '''
     vecs = calcVecs(samples, repeat=False)
     habv = calcHABVByVecs(vecs)
     lagNum = 20

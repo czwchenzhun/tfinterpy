@@ -6,6 +6,12 @@ import os.path as op
 
 
 def getNCFileList(dirPath):
+    '''
+    Returns all netcdf files' path under the specified directory.
+
+    :param dirPath: str, directory.
+    :return: list, files' path.
+    '''
     ls = []
     if not op.exists(dirPath):
         return ls
@@ -16,6 +22,16 @@ def getNCFileList(dirPath):
 
 
 def peakNCWH(filePath, wk="lon", hk="lat"):
+    '''
+    Get the width and height information contained in the nc file.
+
+    :param filePath: str.
+    :param wk: str, the key corresponding to the width.
+    :param hk: str, the key corresponding to the height.
+    :return: tuple, (width, height).
+        If the file does not contain width and height information,
+        return (None,None).
+    '''
     if not op.exists(filePath):
         return None, None
     try:
@@ -30,6 +46,14 @@ def peakNCWH(filePath, wk="lon", hk="lat"):
 
 
 def peakNCInfo(filePath):
+    '''
+     Get the key and corresponding shape information contained in the nc file.
+
+    :param filePath: str.
+    :return: tuple, (keys,info).
+        keys is list containing all key in nc file.
+        info is a string that records the shape of the variables.
+    '''
     if not op.exists(filePath):
         return None, None
     try:
@@ -50,14 +74,18 @@ def peakNCInfo(filePath):
 
 def getSamples(filePathOrData, X, Y, Z, begin=(0, 0), sub=(200, 200), N=10):
     '''
-    :param filePath: netcdf文件路径
-    :param X: lats（纬度的字段）
-    :param Y: lons（经度的字段）
-    :param Z: ele（海拔的字段）
-    :param begin: 采样子图的起点位置
-    :param sub: 采样子图的size
-    :param per: X和Y方向的采样数目
-    :return: samples（子图内随机采样得到的采样点）,lats（子图的纬度），lons（子图的经度）,ele（子图的海拔）
+    :param filePath: str.
+    :param X: str, key of lats.
+    :param Y: str, key of lons.
+    :param Z: str, key of ele.
+    :param begin: tuple, the begining index of the submap.
+    :param sub: tuple, the size of the submap.
+    :param N: integer, number of samples in X and Y directions.
+    :return: tuple, (samples,lats,lons,ele).
+        samples is the sampling point obtained by random sampling within the submap.
+        lats is latitude of submap.
+        lons is longitude of submap.
+        ele is elevation of submap.
     '''
     if type(filePathOrData) == type(''):
         dem = nc.Dataset(filePathOrData)

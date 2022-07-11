@@ -2,6 +2,12 @@ import pandas as pd
 
 
 def readGslibPoints(filePath):
+    '''
+    Read points data from gslib file.
+
+    :param filePath: str.
+    :return: DataFrame object.
+    '''
     columnNames = []
     with open(filePath, 'r') as fi:
         fi.readline()
@@ -9,14 +15,23 @@ def readGslibPoints(filePath):
         for i in range(n):
             columnNames.append(fi.readline().strip())
         fi.close()
-    df = pd.read_csv(filePath, sep=',|\s+', skiprows=n + 2, header=None)
+    df = pd.read_csv(filePath, sep=',|\s+', skiprows=n + 2, header=None, engine="python")
     df.columns = columnNames
     return df
 
 
-def saveGslibPoints(filePath, colNames, ndarray, title="#"):
+def saveGslibPoints(filePath, colNames, ndarray, comment="#"):
+    '''
+    Save points data to gslib file.
+
+    :param filePath: str.
+    :param colNames: list, column names.
+    :param ndarray: ndarray, points and properties data.
+    :param comment: str, comment on the first line of the gslib file.
+    :return: None.
+    '''
     fo = open(filePath, 'w')
-    fo.write(title + '\n')
+    fo.write(comment + '\n')
     fo.write('{}\n'.format(len(colNames)))
     for name in colNames:
         fo.write(name + '\n')
@@ -26,6 +41,18 @@ def saveGslibPoints(filePath, colNames, ndarray, title="#"):
 
 
 def saveGslibGrid(filePath, dim, begin, step, colNames, ndarray, comment=None):
+    '''
+    Save rectilinear grid data to gslib file.
+
+    :param filePath: str.
+    :param dim: list, [xnum, ynum, znum], xnum indicates the number of x coordinates.
+    :param begin: list, [x,y,z], begin coordinates.
+    :param step: list, [xstep,ystep,zstep], xstep indicates the step on x axis.
+    :param colNames: list, column names.
+    :param ndarray: ndarray, points and properties data.
+    :param comment: str, comment on the first line of the gslib file.
+    :return: None.
+    '''
     fo = open(filePath, 'w')
     if comment is not None:
         fo.write('#' + comment + '\n')

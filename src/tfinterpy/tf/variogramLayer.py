@@ -4,6 +4,10 @@ from tensorflow.keras import layers
 tf.keras.backend.set_floatx('float64')
 
 class LinearLayer(layers.Layer):
+    '''
+    The keras layer representing the linear variogram function model.
+    '''
+
     def __init__(self, slope, C0):
         super(LinearLayer, self).__init__()
         self.slope = tf.constant(slope)
@@ -14,6 +18,10 @@ class LinearLayer(layers.Layer):
 
 
 class PowerLayer(layers.Layer):
+    '''
+    The keras layer representing the power variogram function model.
+    '''
+
     def __init__(self, scale, exp, C0):
         super(PowerLayer, self).__init__()
         self.scale = tf.constant(scale)
@@ -25,6 +33,10 @@ class PowerLayer(layers.Layer):
 
 
 class GaussianLayer(layers.Layer):
+    '''
+    The keras layer representing the gaussian variogram function model.
+    '''
+
     def __init__(self, C, a, C0):
         super(GaussianLayer, self).__init__()
         self.C = tf.constant(C)
@@ -36,6 +48,10 @@ class GaussianLayer(layers.Layer):
 
 
 class ExponentLayer(layers.Layer):
+    '''
+    The keras layer representing the exponent variogram function model.
+    '''
+
     def __init__(self, C, a, C0):
         super(ExponentLayer, self).__init__()
         self.C = tf.constant(C)
@@ -47,6 +63,10 @@ class ExponentLayer(layers.Layer):
 
 
 class SphericalLayer(layers.Layer):
+    '''
+    The keras layer representing the spherical variogram function model.
+    '''
+
     def __init__(self, C, a, C0):
         super(SphericalLayer, self).__init__()
         self.C = tf.constant(C)
@@ -61,7 +81,17 @@ class SphericalLayer(layers.Layer):
 
 
 class NestVariogramLayer(layers.Layer):
+    '''
+    The keras layer representing the nested variogram functions.
+    '''
+
     def __init__(self, variogramLayers, unitVectors):
+        '''
+        Construct a nested variogram function layer.
+
+        :param variogramLayers: list, containing variogram layers.
+        :param unitVectors: array_like, unit vectors corresponding to the direction.
+        '''
         super(NestVariogramLayer, self).__init__()
         self.variogramLayers = variogramLayers
         self.unitVectors = unitVectors
@@ -87,12 +117,25 @@ VariogramLayerMap = {
 
 
 def getVariogramLayer(variogramBuilder):
+    '''
+    Construct variogram layer by variogram builder.
+
+    :param variogramBuilder: VariogramBuilder object.
+    :return: keras' layer object.
+    '''
     LayerClass = VariogramLayerMap[variogramBuilder.model]
     vl = LayerClass(*variogramBuilder.params)
     return vl
 
 
 def getNestVariogramLayer(variogramBuilders, unitVectors):
+    '''
+    Construct nested variogram layer by variogram builders and corresponding unit vectors.
+
+    :param variogramBuilders: list, containing variogram builders.
+    :param unitVectors: array_like, unit vectors corresponding to the direction.
+    :return: keras' layer object.
+    '''
     vls = []
     for vb in variogramBuilders:
         vl = getVariogramLayer(vb)

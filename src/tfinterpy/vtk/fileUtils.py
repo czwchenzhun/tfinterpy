@@ -5,12 +5,26 @@
 import vtk
 
 def saveVTKPoints(filePath,polyData):
+    '''
+    Save vtkPoints to file.
+
+    :param filePath: str.
+    :param polyData: vtkPolyData object.
+    :return: None.
+    '''
     writer=vtk.vtkPolyDataWriter()
     writer.SetFileName(filePath)
     writer.SetInputData(polyData)
     writer.Write()
 
 def saveVTKGrid(filePath,rectilinearGrid):
+    '''
+    Save vtkRectilinearGrid to file.
+
+    :param filePath: str.
+    :param rectilinearGrid: vtkRectilinearGrid object.
+    :return: None.
+    '''
     writer=vtk.vtkRectilinearGridWriter()
     writer.SetFileName(filePath)
     writer.SetInputData(rectilinearGrid)
