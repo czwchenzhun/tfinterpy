@@ -31,7 +31,7 @@ if __name__ == "__main__":
     exe = OK(samples, '3d')# Create a ok interpolator.
     t1=time.perf_counter()
     # Perform interpolation of all points in the grid.
-    grid.pro, grid.sigma = exe.execute(grid.points(), N, nestVariogram)
+    grid.pro, grid.sigma = exe.execute(grid.points(), N, nestVariogram, workerNum=3)
     print('predict time,',time.perf_counter()-t1)
 
     print(exe.crossValidate(N, nestVariogram))# Perform leave-one-out validation and print result.

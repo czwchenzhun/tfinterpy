@@ -2,7 +2,8 @@ from scipy.spatial import cKDTree
 import numpy as np
 from tfinterpy.utils import kSplit, calcVecs
 from tfinterpy.variogram import NestVariogram
-
+from multiprocessing import Pool
+from functools import partial
 
 class SK:
     '''
@@ -25,7 +26,7 @@ class SK:
             self._i = 3
         self.innerVecs = None
 
-    def execute(self, points, N=8, variogram=None):
+    def execute(self, points, N=8, variogram=None, workerNum=1):
         '''
         Perform interpolation for points and return result values.
 
@@ -33,10 +34,24 @@ class SK:
         :param N: integer, neighborhood size.
         :param variogram: variogram function or nest variogram object, default None.
             A linear variogram (lambda x:x) is used when the variogram is None.
+        :param workerNum: By default, one process is used, and multi-process computation is used when wokerNum>1.
         :return: tuple, tuple containing tow ndarray.
             The first ndarray representing the interpolation result,
             the second ndarray representing the kriging variance.
         '''
+        if workerNum>1:
+            pfunc=partial(self.execute,N=N,variogram=variogram,workerNum=1)
+            size=int(np.ceil(len(points)//workerNum))+1
+            with Pool(workerNum) as p:
+                result=p.map(pfunc,[points[i*size:(i+1)*size] for i in range(workerNum)])
+            properties=result[0][0]
+            sigmas=result[0][1]
+            result.pop(0)
+            while len(result)>0:
+                pro,sig=result.pop(0)
+                properties=np.append(properties,pro)
+                sigmas=np.append(sigmas,sig)
+            return properties,sigmas
         if self.innerVecs is None:
             self.__calcInnerVecs__()
         if variogram is None:
@@ -184,7 +199,7 @@ class OK:
             self._i = 3
         self.innerVecs = None
 
-    def execute(self, points, N=8, variogram=None):
+    def execute(self, points, N=8, variogram=None, workerNum=1):
         '''
         Perform interpolation for points and return result values.
 
@@ -192,10 +207,24 @@ class OK:
         :param N: integer, neighborhood size.
         :param variogram: variogram function or nest variogram object, default None.
             A linear variogram (lambda x:x) is used when the variogram is None.
+        :param workerNum: By default, one process is used, and multi-process computation is used when wokerNum>1.
         :return: tuple, tuple containing tow ndarray.
             The first ndarray representing the interpolation result,
             the second ndarray representing the kriging variance.
         '''
+        if workerNum>1:
+            pfunc=partial(self.execute,N=N,variogram=variogram,workerNum=1)
+            size=int(np.ceil(len(points)//workerNum))+1
+            with Pool(workerNum) as p:
+                result=p.map(pfunc,[points[i*size:(i+1)*size] for i in range(workerNum)])
+            properties=result[0][0]
+            sigmas=result[0][1]
+            result.pop(0)
+            while len(result)>0:
+                pro,sig=result.pop(0)
+                properties=np.append(properties,pro)
+                sigmas=np.append(sigmas,sig)
+            return properties,sigmas
         if self.innerVecs is None:
             self.__calcInnerVecs__()
         if variogram is None:
