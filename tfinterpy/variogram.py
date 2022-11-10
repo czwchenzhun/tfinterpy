@@ -2,6 +2,7 @@ from tfinterpy.utils import *
 from tfinterpy.variogramExp import search2d, search3d
 from tfinterpy.variogramModel import variogramModel, VariogramModelMap
 from scipy.optimize import least_squares
+from functools import partial
 
 EPS = 1e-16
 
@@ -15,7 +16,8 @@ def resident(params, x, y, variogram_function):
     :param variogram_function: function, variogram function.
     :return: number or ndarray, resident=( variogram(x,params[0],...,params[n])-y )^2
     '''
-    error = variogram_function(x, *params) - y
+    # error = variogram_function(x, *params) - y
+    error = variogram_function(*params, x) - y
     return error ** 2
 
 
@@ -83,9 +85,9 @@ class VariogramBuilder:
         Get variogram function(closure function).
         :return: function.
         '''
-        def variogram(h):
-            return variogramModel(self.model)(h, *self.params)
-        return variogram
+        func=variogramModel(self.model)
+        pfunc=partial(func,*self.params)
+        return pfunc
 
 
 class NestVariogram:
