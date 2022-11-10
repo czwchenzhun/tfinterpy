@@ -6,6 +6,7 @@ import tfinterpy.vtk.colorMap as CM
 from tfinterpy.vtk.rendering import createGridActor, rendering
 from tfinterpy.vtk.fileUtils import saveVTKGrid
 import matplotlib.pyplot as plt
+import time
 
 if __name__ == "__main__":
     filePath = "data/sample_data.gslib"
@@ -16,7 +17,7 @@ if __name__ == "__main__":
 
     # Create linear 3D grid.
     grid = Grid3D()
-    grid.rectlinear((100, 100, 10), (samples[:, 0].min(), samples[:, 0].max()),
+    grid.rectlinear((100, 100, 30), (samples[:, 0].min(), samples[:, 0].max()),
                     (samples[:, 1].min(), samples[:, 1].max()), (samples[:, 2].min(), samples[:, 2].max()))
     exe = OK(samples, '3d')# Create a ok interpolator.
     vb = calculateDefaultVariogram3D(samples)# Calculate a default variogram function.
@@ -24,8 +25,10 @@ if __name__ == "__main__":
     vb.showVariogram()
     plt.show()
 
+    t1=time.perf_counter()
     # Perform interpolation of all points in the grid.
     grid.pro, grid.sigma = exe.execute(grid.points(), N, vb.getVariogram())
+    print("elapse time,",time.perf_counter()-t1)
     print(exe.crossValidate(N, vb.getVariogram()))# Perform leave-one-out validation and print result.
     print(exe.crossValidateKFold(10, N, vb.getVariogram()))# Perform k-fold validation and print result.
 

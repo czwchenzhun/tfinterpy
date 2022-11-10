@@ -7,6 +7,7 @@ import tfinterpy.vtk.colorMap as CM
 from tfinterpy.vtk.fileUtils import saveVTKGrid
 from tfinterpy.utils import calcVecs
 import matplotlib.pyplot as plt
+import time
 
 if __name__ == "__main__":
     filePath = "data/sample_data.gslib"
@@ -28,8 +29,10 @@ if __name__ == "__main__":
         plt.show()
 
     exe = SK(samples, '3d')# Create a sk interpolator.
+    t1=time.perf_counter()
     # Perform interpolation of all points in the grid.
     grid.pro, grid.sigma = exe.execute(grid.points(), N, nestVariogram)
+    print('predict time,', time.perf_counter() - t1)
 
     print(exe.crossValidate(N, nestVariogram))# Perform leave-one-out validation and print result.
     print(exe.crossValidateKFold(10, N, nestVariogram))# Perform k-fold validation and print result.

@@ -6,6 +6,7 @@ from scipy.spatial import cKDTree
 import numpy as np
 from tfinterpy.utils import kSplit, calcVecs
 from tfinterpy.tf.variogramLayer import NestVariogramLayer
+from numba import jit
 
 # tf.keras.backend.set_floatx('float64')
 
@@ -65,6 +66,20 @@ class TFSK:
             self._i = 3
         self.innerVecs = None
 
+    @jit(nopython=True)
+    def __assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, innerVars, samples, dim):
+        for idx, indice in enumerate(nbIdx):
+            kmatArr[idx] = innerVars[indice][:, indice]
+            mvecArr[idx] = nbd[idx]
+            neighProArr[idx] = samples[indice, dim]
+
+    @jit(nopython=True)
+    def __assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, innerVars, samples, points, dim):
+        for idx, indice in enumerate(nbIdx):
+            kmatArr[idx] = innerVars[indice][:, indice]
+            mvecArr[idx] = samples[indice, :dim] - points[idx]
+            neighProArr[idx] = samples[indice, dim]
+
     def execute(self, points, N=8, variogramLayer=None, batch_size=10000):
         '''
         Perform interpolation for points and return result values.
@@ -113,13 +128,17 @@ class TFSK:
                 init = True
             points_ = points[begin:end]
             nbd, nbIdx = tree.query(points_, k=N, eps=0.0)
-            for idx, indice in enumerate(nbIdx):
-                kmatArr[idx] = self.innerVars[indice][:, indice]
-                if isNest:
-                    mvecArr[idx] = self.samples[indice, :self._i] - points_[idx]
-                else:
-                    mvecArr[idx] = nbd[idx]
-                neighProArr[idx] = self.samples[indice, self._i]
+            # for idx, indice in enumerate(nbIdx):
+            #     kmatArr[idx] = self.innerVars[indice][:, indice]
+            #     if isNest:
+            #         mvecArr[idx] = self.samples[indice, :self._i] - points_[idx]
+            #     else:
+            #         mvecArr[idx] = nbd[idx]
+            #     neighProArr[idx] = self.samples[indice, self._i]
+            if isNest:
+                TFSK.__assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, points_, self._i)
+            else:
+                TFSK.__assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, self._i)
             pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
             pros = np.append(pros, pro)
             sigmas = np.append(sigmas, sigma)
@@ -275,7 +294,6 @@ def OKModel(n=8, variogramLayer=None, vecDim=2):
     model = Model(inputs=[kmat_, mvec_, pro], outputs=[estimate, sigma])
     return model
 
-
 class TFOK:
     '''
     Tensorflow version of Ordinary Kriging interpolator.
@@ -296,6 +314,20 @@ class TFOK:
         if mode.lower() == '3d':
             self._i = 3
         self.innerVecs = None
+
+    @jit(nopython=True)
+    def __assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, innerVars, samples, N, dim):
+        for idx, indice in enumerate(nbIdx):
+            kmatArr[idx, :N, :N] = innerVars[indice][:, indice]
+            mvecArr[idx, :N] = nbd[idx]
+            neighProArr[idx] = samples[indice, dim]
+
+    @jit(nopython=True)
+    def __assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, innerVars, samples, points, N, dim):
+        for idx, indice in enumerate(nbIdx):
+            kmatArr[idx, :N, :N] = innerVars[indice][:, indice]
+            mvecArr[idx, :N] = samples[indice, :dim] - points[idx]
+            neighProArr[idx] = samples[indice, dim]
 
     def execute(self, points, N=8, variogramLayer=None, batch_size=10000):
         '''
@@ -347,13 +379,17 @@ class TFOK:
                 init = True
             points_ = points[begin:end]
             nbd, nbIdx = tree.query(points_, k=self.N, eps=0.0)
-            for idx, indice in enumerate(nbIdx):
-                kmatArr[idx, :N, :N] = self.innerVars[indice][:, indice]
-                if isNest:
-                    mvecArr[idx, :N] = self.samples[indice, :self._i] - points_[idx]
-                else:
-                    mvecArr[idx, :N] = nbd[idx]
-                neighProArr[idx] = self.samples[indice, self._i]
+            # for idx, indice in enumerate(nbIdx):
+            #     kmatArr[idx, :N, :N] = self.innerVars[indice][:, indice]
+            #     if isNest:
+            #         mvecArr[idx, :N] = self.samples[indice, :self._i] - points_[idx]
+            #     else:
+            #         mvecArr[idx, :N] = nbd[idx]
+            #     neighProArr[idx] = self.samples[indice, self._i]
+            if isNest:
+                TFOK.__assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, points_, N, self._i)
+            else:
+                TFOK.__assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, N, self._i)
             pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
             pros = np.append(pros, pro)
             sigmas = np.append(sigmas, sigma)
