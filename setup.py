@@ -5,7 +5,7 @@ with open("README.md","r",encoding="utf-8") as fi:
 
 setuptools.setup(
     name="TFInterpy",
-    version="1.0.1",
+    version="1.1.1",
     author="Zhiwen Chen",
     author_email="orchenz@qq.com",
     description="A high-performance spatial interpolation Python package. It contains IDW (Inverse Distance Weighted), SK (Simple Kriging), OK (Ordinary Kriging) algorithms, and visualization tools based on QT and VTK.",

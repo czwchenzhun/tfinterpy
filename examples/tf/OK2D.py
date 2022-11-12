@@ -13,9 +13,9 @@ if __name__ == "__main__":
     print(tf.config.experimental.list_physical_devices('GPU'))  # Prints all GPU devices.
 
     random.seed(1)
-    W, H = 200, 200
+    W, H = 100, 100
     M = 100
-    offset = (100, 300)
+    offset = (100, 100)
     N = 8
 
     # Get sample points and original elevation data from netcdf file
@@ -37,9 +37,9 @@ if __name__ == "__main__":
     exe = TFOK(samples)# Create a ok(tensorflow version) interpolator.
 
     # Specify the GPU to be used.
-    with tf.device("/GPU:0"):
+    # with tf.device("/CPU:0"):
         # Perform interpolation of all points in the grid.
-        grid.pro, grid.sigma = exe.execute(grid.points(), N, vl, 1000)
+    grid.pro, grid.sigma = exe.execute(grid.points(), N, vl, 100, workerNum=3,device="/GPU:0")
 
     print(exe.crossValidateKFold(10, N, vl))# Perform k-fold validation and print result.
     print(exe.crossValidate(N, vl))# Perform leave-one-out validation and print result.

@@ -7,6 +7,8 @@ import numpy as np
 from tfinterpy.utils import kSplit, calcVecs
 from tfinterpy.tf.variogramLayer import NestVariogramLayer
 from numba import jit
+from multiprocessing import Pool
+from functools import partial
 
 # tf.keras.backend.set_floatx('float64')
 
@@ -80,7 +82,7 @@ class TFSK:
             mvecArr[idx] = samples[indice, :dim] - points[idx]
             neighProArr[idx] = samples[indice, dim]
 
-    def execute(self, points, N=8, variogramLayer=None, batch_size=10000):
+    def execute(self, points, N=8, variogramLayer=None, batch_size=10000, workerNum=1, device='/CPU:0'):
         '''
         Perform interpolation for points and return result values.
 
@@ -88,60 +90,77 @@ class TFSK:
         :param N: integer, neighborhood size.
         :param variogramLayer: keras' layer, layer representing a variogram function.
         :param batch_size: integer, size of each batch of data to be calculated.
+        :param workerNum: By default, one process is used, and multi-process computation is used when wokerNum>1.
+            Notice! If GPU device is specified, the multi-process cannot be enabled.
+        :param device: Specified computing device, default value is '/CPU:0'.
         :return: tuple, tuple containing tow ndarray.
             The first ndarray representing the interpolation result,
             the second ndarray representing the kriging variance.
         '''
-        self.N = N
-        self.model = SKModel(N, variogramLayer, self._i)
-        isNest = variogramLayer.__class__ == NestVariogramLayer
-        if self.innerVecs is None:
-            self.__calcInnerVecs__()
-        if variogramLayer is None:
-            self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
-        elif isNest:
-            self.innerVars = variogramLayer(self.innerVecs).numpy()
-        else:
-            self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
-            self.innerVars = variogramLayer(self.innerVars).numpy()
-        if self.innerVars.shape[-1] == 1:
-            self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
-
-        tree = cKDTree(self.samples[:, :self._i])
-        step = batch_size * 3
-        num = int(np.ceil(len(points) / step))
-        pros = np.empty((0, 1))
-        sigmas = np.empty((0, 1))
-        init = False
-        for i in range(num):
-            begin = i * step
-            end = (i + 1) * step
-            if end > len(points):
-                end = len(points)
-            if not init or i == num - 1:
-                kmatArr = np.zeros((end - begin, N, N))
-                if isNest:
-                    mvecArr = np.zeros((end - begin, N, self._i))
-                else:
-                    mvecArr = np.zeros((end - begin, N))
-                neighProArr = np.zeros((end - begin, N))
-                init = True
-            points_ = points[begin:end]
-            nbd, nbIdx = tree.query(points_, k=N, eps=0.0)
-            # for idx, indice in enumerate(nbIdx):
-            #     kmatArr[idx] = self.innerVars[indice][:, indice]
-            #     if isNest:
-            #         mvecArr[idx] = self.samples[indice, :self._i] - points_[idx]
-            #     else:
-            #         mvecArr[idx] = nbd[idx]
-            #     neighProArr[idx] = self.samples[indice, self._i]
-            if isNest:
-                TFSK.__assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, points_, self._i)
+        if workerNum>1 and not 'GPU' in device.upper():
+            pfunc=partial(self.execute,N=N,variogramLayer=variogramLayer,batch_size=batch_size,workerNum=1, device=device)
+            size=int(np.ceil(len(points)//workerNum))+1
+            with Pool(workerNum) as p:
+                result=p.map(pfunc,[points[i*size:(i+1)*size] for i in range(workerNum)])
+            properties=result[0][0]
+            sigmas=result[0][1]
+            result.pop(0)
+            while len(result)>0:
+                pro,sig=result.pop(0)
+                properties=np.append(properties,pro)
+                sigmas=np.append(sigmas,sig)
+            return properties,sigmas
+        with tf.device(device):
+            self.N = N
+            self.model = SKModel(N, variogramLayer, self._i)
+            isNest = variogramLayer.__class__ == NestVariogramLayer
+            if self.innerVecs is None:
+                self.__calcInnerVecs__()
+            if variogramLayer is None:
+                self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
+            elif isNest:
+                self.innerVars = variogramLayer(self.innerVecs).numpy()
             else:
-                TFSK.__assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, self._i)
-            pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
-            pros = np.append(pros, pro)
-            sigmas = np.append(sigmas, sigma)
+                self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
+                self.innerVars = variogramLayer(self.innerVars).numpy()
+            if self.innerVars.shape[-1] == 1:
+                self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
+
+            tree = cKDTree(self.samples[:, :self._i])
+            step = batch_size * 3
+            num = int(np.ceil(len(points) / step))
+            pros = np.empty((0, 1))
+            sigmas = np.empty((0, 1))
+            init = False
+            for i in range(num):
+                begin = i * step
+                end = (i + 1) * step
+                if end > len(points):
+                    end = len(points)
+                if not init or i == num - 1:
+                    kmatArr = np.zeros((end - begin, N, N))
+                    if isNest:
+                        mvecArr = np.zeros((end - begin, N, self._i))
+                    else:
+                        mvecArr = np.zeros((end - begin, N))
+                    neighProArr = np.zeros((end - begin, N))
+                    init = True
+                points_ = points[begin:end]
+                nbd, nbIdx = tree.query(points_, k=N, eps=0.0)
+                # for idx, indice in enumerate(nbIdx):
+                #     kmatArr[idx] = self.innerVars[indice][:, indice]
+                #     if isNest:
+                #         mvecArr[idx] = self.samples[indice, :self._i] - points_[idx]
+                #     else:
+                #         mvecArr[idx] = nbd[idx]
+                #     neighProArr[idx] = self.samples[indice, self._i]
+                if isNest:
+                    TFSK.__assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, points_, self._i)
+                else:
+                    TFSK.__assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, self._i)
+                pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
+                pros = np.append(pros, pro)
+                sigmas = np.append(sigmas, sigma)
         return pros, sigmas
 
     def crossValidateKFold(self, K=10, N=8, variogramLayer=None):
@@ -329,7 +348,7 @@ class TFOK:
             mvecArr[idx, :N] = samples[indice, :dim] - points[idx]
             neighProArr[idx] = samples[indice, dim]
 
-    def execute(self, points, N=8, variogramLayer=None, batch_size=10000):
+    def execute(self, points, N=8, variogramLayer=None, batch_size=10000, workerNum=1, device='/CPU:0'):
         '''
         Perform interpolation for points and return result values.
 
@@ -337,62 +356,79 @@ class TFOK:
         :param N: integer, neighborhood size.
         :param variogramLayer: keras' layer, layer representing a variogram function.
         :param batch_size: integer, size of each batch of data to be calculated.
+        :param workerNum: By default, one process is used, and multi-process computation is used when wokerNum>1.
+            Notice! If GPU device is specified, the multi-process cannot be enabled.
+        :param device: Specified computing device, default value is '/CPU:0'.
         :return: tuple, tuple containing tow ndarray.
             The first ndarray representing the interpolation result,
             the second ndarray representing the kriging variance.
         '''
-        self.N = N
-        self.model = OKModel(N, variogramLayer, self._i)
-        isNest = variogramLayer.__class__ == NestVariogramLayer
-        if self.innerVecs is None:
-            self.__calcInnerVecs__()
-        if variogramLayer is None:
-            self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
-        elif isNest:
-            self.innerVars = variogramLayer(self.innerVecs).numpy()
-        else:
-            self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
-            self.innerVars = variogramLayer(self.innerVars).numpy()
-        if self.innerVars.shape[-1] == 1:
-            self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
-
-        tree = cKDTree(self.samples[:, :self._i])
-        step = batch_size * 3
-        num = int(np.ceil(len(points) / step))
-        pros = np.empty((0, 1))
-        sigmas = np.empty((0, 1))
-        init = False
-        for i in range(num):
-            begin = i * step
-            end = (i + 1) * step
-            if end > len(points):
-                end = len(points)
-            if not init or i == num - 1:
-                kmatArr = np.ones((end - begin, N + 1, N + 1))
-                for j in range(end - begin):
-                    kmatArr[j, N, N] = 0.0
-                if isNest:
-                    mvecArr = np.zeros((end - begin, N + 1, self._i))
-                else:
-                    mvecArr = np.ones((end - begin, N + 1))
-                neighProArr = np.zeros((end - begin, N))
-                init = True
-            points_ = points[begin:end]
-            nbd, nbIdx = tree.query(points_, k=self.N, eps=0.0)
-            # for idx, indice in enumerate(nbIdx):
-            #     kmatArr[idx, :N, :N] = self.innerVars[indice][:, indice]
-            #     if isNest:
-            #         mvecArr[idx, :N] = self.samples[indice, :self._i] - points_[idx]
-            #     else:
-            #         mvecArr[idx, :N] = nbd[idx]
-            #     neighProArr[idx] = self.samples[indice, self._i]
-            if isNest:
-                TFOK.__assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, points_, N, self._i)
+        if workerNum>1 and not 'GPU' in device.upper():
+            pfunc=partial(self.execute,N=N,variogramLayer=variogramLayer,batch_size=batch_size,workerNum=1, device=device)
+            size=int(np.ceil(len(points)//workerNum))+1
+            with Pool(workerNum) as p:
+                result=p.map(pfunc,[points[i*size:(i+1)*size] for i in range(workerNum)])
+            properties=result[0][0]
+            sigmas=result[0][1]
+            result.pop(0)
+            while len(result)>0:
+                pro,sig=result.pop(0)
+                properties=np.append(properties,pro)
+                sigmas=np.append(sigmas,sig)
+            return properties,sigmas
+        with tf.device(device):
+            self.N = N
+            self.model = OKModel(N, variogramLayer, self._i)
+            isNest = variogramLayer.__class__ == NestVariogramLayer
+            if self.innerVecs is None:
+                self.__calcInnerVecs__()
+            if variogramLayer is None:
+                self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
+            elif isNest:
+                self.innerVars = variogramLayer(self.innerVecs).numpy()
             else:
-                TFOK.__assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, N, self._i)
-            pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
-            pros = np.append(pros, pro)
-            sigmas = np.append(sigmas, sigma)
+                self.innerVars = np.linalg.norm(self.innerVecs, axis=2)
+                self.innerVars = variogramLayer(self.innerVars).numpy()
+            if self.innerVars.shape[-1] == 1:
+                self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
+
+            tree = cKDTree(self.samples[:, :self._i])
+            step = batch_size * 3
+            num = int(np.ceil(len(points) / step))
+            pros = np.empty((0, 1))
+            sigmas = np.empty((0, 1))
+            init = False
+            for i in range(num):
+                begin = i * step
+                end = (i + 1) * step
+                if end > len(points):
+                    end = len(points)
+                if not init or i == num - 1:
+                    kmatArr = np.ones((end - begin, N + 1, N + 1))
+                    for j in range(end - begin):
+                        kmatArr[j, N, N] = 0.0
+                    if isNest:
+                        mvecArr = np.zeros((end - begin, N + 1, self._i))
+                    else:
+                        mvecArr = np.ones((end - begin, N + 1))
+                    neighProArr = np.zeros((end - begin, N))
+                    init = True
+                points_ = points[begin:end]
+                nbd, nbIdx = tree.query(points_, k=self.N, eps=0.0)
+                # for idx, indice in enumerate(nbIdx):
+                #     kmatArr[idx, :N, :N] = self.innerVars[indice][:, indice]
+                #     if isNest:
+                #         mvecArr[idx, :N] = self.samples[indice, :self._i] - points_[idx]
+                #     else:
+                #         mvecArr[idx, :N] = nbd[idx]
+                #     neighProArr[idx] = self.samples[indice, self._i]
+                if isNest:
+                    TFOK.__assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, points_, N, self._i)
+                else:
+                    TFOK.__assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, N, self._i)
+                pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
+                pros = np.append(pros, pro)
+                sigmas = np.append(sigmas, sigma)
         return pros, sigmas
 
     def crossValidateKFold(self, K=10, N=8, variogramLayer=None):

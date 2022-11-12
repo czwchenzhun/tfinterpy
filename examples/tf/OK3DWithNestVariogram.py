@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     # Create linear 3D grid.
     grid = Grid3D()
-    grid.rectlinear((100, 100, 100), (samples[:, 0].min(), samples[:, 0].max()),
+    grid.rectlinear((1000, 100, 100), (samples[:, 0].min(), samples[:, 0].max()),
                     (samples[:, 1].min(), samples[:, 1].max()), (samples[:, 2].min(), samples[:, 2].max()))
 
     # Calculate nested variation function.
@@ -40,9 +40,9 @@ if __name__ == "__main__":
     exe = TFOK(samples, '3d')# Create a ok(tensorflow version) interpolator.
     t1=time.perf_counter()
     # Specify the GPU to be used.
-    with tf.device("/CPU:0"):
+    # with tf.device("/CPU:0"):
         # Perform interpolation of all points in the grid.
-        grid.pro, grid.sigma = exe.execute(grid.points(), N, vl, batch_size=10000)
+    grid.pro, grid.sigma = exe.execute(grid.points(), N, vl, batch_size=10000, workerNum=2, device='/CPU:0')
     print("predice time,", time.perf_counter() - t1)
 
     print(exe.crossValidateKFold(10, N, vl))# Perform k-fold validation and print result.
