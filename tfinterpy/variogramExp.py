@@ -18,7 +18,7 @@ def search2d(vecs, vars, lagNum, lagInterval, lagTole, angle, angleTole, bandWid
         processedLags is the mean-processed lags.
         lags is original searched lags.
     '''
-    unitVector = np.array([np.cos(angle), np.sin(angle)])
+    unitVector = np.array([np.cos(angle), np.sin(angle)],dtype=np.float32)
     return searchLags(vecs, vars, lagNum, lagInterval, lagTole, unitVector, angleTole, bandWidth)
 
 
@@ -38,7 +38,7 @@ def search3d(vecs, vars, lagNum, lagInterval, lagTole, azimuth, dip, angleTole, 
         processedLags is the mean-processed lags.
         lags is original searched lags.
     '''
-    unitVector = np.array([np.cos(azimuth) * np.cos(dip), np.sin(azimuth) * np.cos(dip), np.sin(dip)])
+    unitVector = np.array([np.cos(azimuth) * np.cos(dip), np.sin(azimuth) * np.cos(dip), np.sin(dip)],dtype=np.float32)
     return searchLags(vecs, vars, lagNum, lagInterval, lagTole, unitVector, angleTole, bandWidth)
 
 

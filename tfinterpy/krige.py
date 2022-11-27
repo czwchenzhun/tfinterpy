@@ -67,8 +67,8 @@ class SK:
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(points, k=N, eps=0.0)
-        properties = np.zeros((len(points)))
-        sigmas = np.zeros((len(points)))
+        properties = np.zeros((len(points)),dtype=np.float32)
+        sigmas = np.zeros((len(points)),dtype=np.float32)
         for idx, indice in enumerate(nbIdx):
             kmat = self.innerVars[indice][:, indice]
             if variogram.__class__ == NestVariogram:
@@ -147,7 +147,7 @@ class SK:
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        properties = np.zeros((len(self.samples)))
+        properties = np.zeros((len(self.samples)),dtype=np.float32)
         for idx, indice in enumerate(nbIdx):
             indice = indice[1:]
             kmat = self.innerVars[indice][:, indice]
@@ -240,11 +240,11 @@ class OK:
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(points, k=N, eps=0.0)
-        properties = np.zeros((len(points)))
-        sigmas = np.zeros((len(points)))
-        kmat = np.ones((N + 1, N + 1))
+        properties = np.zeros((len(points)),dtype=np.float32)
+        sigmas = np.zeros((len(points)),dtype=np.float32)
+        kmat = np.ones((N + 1, N + 1),dtype=np.float32)
         kmat[N, N] = 0.0
-        mvec = np.ones((N + 1,))
+        mvec = np.ones((N + 1,),dtype=np.float32)
         for idx, indice in enumerate(nbIdx):
             kmat[:N, :N] = self.innerVars[indice][:, indice]
             if variogram.__class__ == NestVariogram:
@@ -323,10 +323,10 @@ class OK:
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        properties = np.zeros((len(self.samples)))
-        kmat = np.ones((N + 1, N + 1))
+        properties = np.zeros((len(self.samples)),dtype=np.float32)
+        kmat = np.ones((N + 1, N + 1),dtype=np.float32)
         kmat[N, N] = 0.0
-        mvec = np.ones((N + 1,))
+        mvec = np.ones((N + 1,),dtype=np.float32)
         for idx, indice in enumerate(nbIdx):
             indice = indice[1:]
             kmat[:N, :N] = self.innerVars[indice][:, indice]

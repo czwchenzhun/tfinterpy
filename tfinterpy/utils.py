@@ -114,7 +114,7 @@ def calcHAVByVecs(vecs):
     angle = np.arctan2(vecs[:, 1], vecs[:, 0])
     angle[angle < 0] += np.pi
     var = 0.5 * (vecs[:, 2] ** 2)
-    hav = np.zeros((len(vecs), 3))
+    hav = np.zeros((len(vecs), 3),dtype=np.float32)
     hav[:, 0] = distance
     hav[:, 1] = angle
     hav[:, 2] = var
@@ -138,7 +138,7 @@ def calcHABVByVecs(vecs):
     dip = np.arctan2(vecs[:, 2], norm)
     dip[dip < 0] += np.pi
     var = 0.5 * (vecs[:, 3] ** 2)
-    habv = np.zeros((len(vecs), 4))
+    habv = np.zeros((len(vecs), 4),dtype=np.float32)
     habv[:, 0] = distance
     habv[:, 1] = azimuth
     habv[:, 2] = dip
@@ -169,10 +169,10 @@ def calcVecs(data, includeSelf=False, repeat=True):
                 indice.pop(i)
                 vec = data[indice] - data[i]
                 vecs.append(vec)
-        vecs = np.array(vecs)
+        vecs = np.array(vecs,dtype=np.float32)
         return vecs.reshape((vecs.shape[0] * vecs.shape[1], vecs.shape[2]))
     else:
-        vecs = np.empty((0, data.shape[1]))
+        vecs = np.empty((0, data.shape[1]),dtype=np.float32)
         for i in range(L - 1):
             vec = data[i + 1:] - data[i]
             vecs = np.append(vecs, vec, axis=0)

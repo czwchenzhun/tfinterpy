@@ -9,6 +9,7 @@ from tfinterpy.tf.krige import TFOK
 from tfinterpy.grid import Grid3D
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import time
 
 if __name__ == "__main__":
     print(tf.config.experimental.list_physical_devices('CPU'))  # Prints all CPU devices.
@@ -22,23 +23,21 @@ if __name__ == "__main__":
 
     # Create linear 3D grid.
     grid = Grid3D()
-    grid.rectlinear((100, 100, 10), (samples[:, 0].min(), samples[:, 0].max()),
+    grid.rectlinear((1000, 100, 100), (samples[:, 0].min(), samples[:, 0].max()),
                     (samples[:, 1].min(), samples[:, 1].max()), (samples[:, 2].min(), samples[:, 2].max()))
 
     # Calculate a default variogram function.
     vb = calculateDefaultVariogram3D(samples)
-    plt.figure()
-    vb.showVariogram()
-    plt.show()
+    # plt.figure()
+    # vb.showVariogram()
+    # plt.show()
     vl = getVariogramLayer(vb)#Create variogram layer by variogram builder.
 
     exe = TFOK(samples, '3d')# Create a ok(tensorflow version) interpolator.
-
-    # Specify the GPU to be used.
-    with tf.device("/GPU:0"):
-        # Perform interpolation of all points in the grid.
-        grid.pro, grid.sigma = exe.execute(grid.points(), N, vl, 1000)
-
+    t1 = time.perf_counter()
+    # Perform interpolation of all points in the grid.
+    grid.pro, grid.sigma = exe.execute(grid.points(), N, vl, 10000, device='/CPU:0')
+    print("predice time,", time.perf_counter() - t1)
     # Create an actor representing a rectilinear grid and use the interpolation results for color mapping.
     actor = createGridActor(*grid.dim, grid.x, grid.y, grid.z, grid.pro,
                             [samples[:, 3].min(), samples[:, 3].max()], CM.Rainbow)

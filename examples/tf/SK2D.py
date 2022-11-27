@@ -36,10 +36,8 @@ if __name__ == "__main__":
 
     exe = TFSK(samples)# Create a sk(tensorflow version) interpolator.
 
-    # Specify the GPU to be used.
-    with tf.device("/GPU:0"):
-        # Perform interpolation of all points in the grid.
-        grid.pro, grid.sigma = exe.execute(grid.points(), N, vl, 1000)
+    # Perform interpolation of all points in the grid.
+    grid.pro, grid.sigma = exe.execute(grid.points(), N, vl, 1000, device="/GPU:0")
 
     print(exe.crossValidateKFold(10, N, vl))# Perform k-fold validation and print result.
     print(exe.crossValidate(N, vl))# Perform leave-one-out validation and print result.

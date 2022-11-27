@@ -1,10 +1,12 @@
 import tensorflow.keras.backend as K
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
+import tensorflow as tf
 from scipy.spatial import cKDTree
 import numpy as np
 from tfinterpy.utils import kSplit
 
+tf.keras.backend.set_floatx('float32')
 
 def IDWModel(n=8, alpha=2):
     '''
@@ -71,8 +73,8 @@ class TFIDW:
             for idx, indice in enumerate(nbIdx):
                 hList.append(nbd[idx])
                 neighProList.append(self.samples[indice, self._i])
-            hArr = np.array(hList)
-            neighProArr = np.array(neighProList)
+            hArr = np.array(hList,dtype=np.float32)
+            neighProArr = np.array(neighProList,dtype=np.float32)
             pro = self.model.predict([hArr, neighProArr], batch_size=batch_size)
             pros = np.append(pros, pro)
         return pros
@@ -130,8 +132,8 @@ class TFIDW:
         for idx, indice in enumerate(nb_idx):
             hList.append(nbd[idx][1:])
             neighProList.append(self.samples[indice[1:], self._i])
-        hArr = np.array(hList)
-        neighProArr = np.array(neighProList)
+        hArr = np.array(hList,dtype=np.float32)
+        neighProArr = np.array(neighProList,dtype=np.float32)
         pros = self.model.predict([hArr, neighProArr], batch_size=1000)
         pros = pros.reshape(-1)
         error = pros - self.samples[:, self._i]

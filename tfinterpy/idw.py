@@ -34,7 +34,7 @@ class IDW:
         '''
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(points, k=N, eps=0.0)
-        properties = np.zeros((len(points)))
+        properties = np.zeros((len(points)),dtype=np.float32)
         for idx, indice in enumerate(nbIdx):
             hs = nbd[idx]
             hs = hs ** alpha
@@ -92,7 +92,7 @@ class IDW:
         '''
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nb_idx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        properties = np.zeros((len(self.samples)))
+        properties = np.zeros((len(self.samples)),dtype=np.float32)
         for idx, indice in enumerate(nb_idx):
             indice = indice[1:]
             hs = nbd[idx][1:]

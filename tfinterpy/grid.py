@@ -27,9 +27,9 @@ class Grid2D:
         self.xran = xran
         self.yran = yran
         xstep = (xran[1] - xran[0]) / (dim[0] - 1)
-        self.x = np.array([(i * xstep + xran[0]) for i in range(dim[0])])
+        self.x = np.array([(i * xstep + xran[0]) for i in range(dim[0])],dtype=np.float32)
         ystep = (yran[1] - yran[0]) / (dim[1] - 1)
-        self.y = np.array([(i * ystep + yran[0]) for i in range(dim[1])])
+        self.y = np.array([(i * ystep + yran[0]) for i in range(dim[1])],dtype=np.float32)
         self._xy = None
 
     def setXCoords(self, xcoords):
@@ -39,7 +39,7 @@ class Grid2D:
         :param xcoords: array_like, array containing all the coordinates along the x axis.
         :return: None
         '''
-        self.x = np.array(xcoords)
+        self.x = np.array(xcoords,dtype=np.float32)
         self.dim[0] = len(self.x)
         self.xran = [self.x.min(), self.x.max()]
         self._xy = None
@@ -51,7 +51,7 @@ class Grid2D:
         :param ycoords: array_like, array containing all the coordinates along the y axis.
         :return: None
         '''
-        self.y = np.array(ycoords)
+        self.y = np.array(ycoords,dtype=np.float32)
         self.dim[1] = len(self.y)
         self.yran = [self.y.min(), self.y.max()]
         self._xy = None
@@ -64,7 +64,7 @@ class Grid2D:
         :return: ndarray
         '''
         if self._xy is None:
-            self._xy = np.zeros((self.dim[1], self.dim[0], 2))
+            self._xy = np.zeros((self.dim[1], self.dim[0], 2),dtype=np.float32)
             for i in range(self.dim[1]):
                 self._xy[i, :, 0] = self.x
             for i in range(self.dim[0]):
@@ -103,11 +103,11 @@ class Grid3D:
         self.yran = yran
         self.zran = zran
         xstep = (xran[1] - xran[0]) / (dim[0] - 1)
-        self.x = np.array([(i * xstep + xran[0]) for i in range(dim[0])])
+        self.x = np.array([(i * xstep + xran[0]) for i in range(dim[0])],dtype=np.float32)
         ystep = (yran[1] - yran[0]) / (dim[1] - 1)
-        self.y = np.array([(i * ystep + yran[0]) for i in range(dim[1])])
+        self.y = np.array([(i * ystep + yran[0]) for i in range(dim[1])],dtype=np.float32)
         zstep = (zran[1] - zran[0]) / (dim[2] - 1)
-        self.z = np.array([(i * zstep + zran[0]) for i in range(dim[2])])
+        self.z = np.array([(i * zstep + zran[0]) for i in range(dim[2])],dtype=np.float32)
         self._xyz = None
 
     def setXCoords(self, xcoords):
@@ -117,7 +117,7 @@ class Grid3D:
         :param xcoords: array_like, array containing all the coordinates along the x axis.
         :return: None
         '''
-        self.x = np.array(xcoords)
+        self.x = np.array(xcoords,dtype=np.float32)
         self.dim[0] = len(self.x)
         self.xran = [self.x.min(), self.x.max()]
         self._xyz = None
@@ -129,7 +129,7 @@ class Grid3D:
         :param ycoords: array_like, array containing all the coordinates along the y axis.
         :return: None
         '''
-        self.y = np.array(ycoords)
+        self.y = np.array(ycoords,dtype=np.float32)
         self.dim[1] = len(self.y)
         self.yran = [self.y.min(), self.y.max()]
         self._xyz = None
@@ -141,7 +141,7 @@ class Grid3D:
         :param zcoords: array_like, array containing all the coordinates along the z axis.
         :return: None
         '''
-        self.z = np.array(zcoords)
+        self.z = np.array(zcoords,dtype=np.float32)
         self.dim[2] = len(self.z)
         self.zran = [self.z.min(), self.z.max()]
         self._xyz = None
@@ -154,7 +154,7 @@ class Grid3D:
         :return: ndarray
         '''
         if self._xyz is None:
-            self._xyz = np.zeros((self.dim[2], self.dim[1], self.dim[0], 3))
+            self._xyz = np.zeros((self.dim[2], self.dim[1], self.dim[0], 3),dtype=np.float32)
             for i in range(self.dim[2]):
                 for j in range(self.dim[1]):
                     self._xyz[i, j, :, 0] = self.x

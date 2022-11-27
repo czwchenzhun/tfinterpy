@@ -2,7 +2,7 @@ from tfinterpy.krige import OK
 from tfinterpy.grid import Grid2D
 from examples.ncFileUtil import getSamples
 from examples.plotUtils import *
-from tfinterpy.variogram import calculateOmnidirectionalVariogram2D
+from tfinterpy.variogram import calculateOmnidirectionalVariogram2D, calculateDefaultVariogram2D
 from tfinterpy.utils import calcVecs
 import numpy as np
 import random
@@ -24,11 +24,12 @@ if __name__ == "__main__":
     grid.rectlinear((W, H), (1, W), (1, H))
 
     # Calculate a nested variogram function.
-    nv, vbs = calculateOmnidirectionalVariogram2D(samples, model=None)
-    for vb in vbs:
-        plt.figure()
-        vb.showVariogram()
-        plt.show()
+    nv, vbs = calculateOmnidirectionalVariogram2D(samples, model=None, calcWeight=False, partitionNum=8)
+    # nv=calculateDefaultVariogram2D(samples, model='spherical').getVariogram()
+    # for vb in vbs:
+    #     plt.figure()
+    #     vb.showVariogram()
+    #     plt.show()
 
     exe = OK(samples)# Create a ok interpolator.
     # Perform interpolation of all points in the grid.

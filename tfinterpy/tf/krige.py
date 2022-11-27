@@ -5,12 +5,12 @@ from tensorflow.keras.models import Model
 from scipy.spatial import cKDTree
 import numpy as np
 from tfinterpy.utils import kSplit, calcVecs
-from tfinterpy.tf.variogramLayer import NestVariogramLayer
+from tfinterpy.tf.variogramLayer import NestVariogramLayer, dtype
 from numba import jit
 from multiprocessing import Pool
 from functools import partial
 
-# tf.keras.backend.set_floatx('float64')
+# tf.keras.backend.set_floatx('float32')
 
 def SKModel(n=8, variogramLayer=None, vecDim=2):
     '''
@@ -129,8 +129,8 @@ class TFSK:
             tree = cKDTree(self.samples[:, :self._i])
             step = batch_size * 3
             num = int(np.ceil(len(points) / step))
-            pros = np.empty((0, 1))
-            sigmas = np.empty((0, 1))
+            pros = np.empty((0, 1),dtype=np.float32)
+            sigmas = np.empty((0, 1),dtype=np.float32)
             init = False
             for i in range(num):
                 begin = i * step
@@ -138,12 +138,12 @@ class TFSK:
                 if end > len(points):
                     end = len(points)
                 if not init or i == num - 1:
-                    kmatArr = np.zeros((end - begin, N, N))
+                    kmatArr = np.zeros((end - begin, N, N),dtype=np.float32)
                     if isNest:
-                        mvecArr = np.zeros((end - begin, N, self._i))
+                        mvecArr = np.zeros((end - begin, N, self._i),dtype=np.float32)
                     else:
-                        mvecArr = np.zeros((end - begin, N))
-                    neighProArr = np.zeros((end - begin, N))
+                        mvecArr = np.zeros((end - begin, N),dtype=np.float32)
+                    neighProArr = np.zeros((end - begin, N),dtype=np.float32)
                     init = True
                 points_ = points[begin:end]
                 nbd, nbIdx = tree.query(points_, k=N, eps=0.0)
@@ -226,12 +226,12 @@ class TFSK:
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
         L = len(self.samples)
-        kmatArr = np.zeros((L, N, N))
+        kmatArr = np.zeros((L, N, N),dtype=np.float32)
         if isNest:
-            mvecArr = np.zeros((L, N, self._i))
+            mvecArr = np.zeros((L, N, self._i),dtype=np.float32)
         else:
-            mvecArr = np.zeros((L, N))
-        neighProArr = np.zeros((L, N))
+            mvecArr = np.zeros((L, N),dtype=np.float32)
+        neighProArr = np.zeros((L, N),dtype=np.float32)
         for idx, indice in enumerate(nbIdx):
             indice = indice[1:]
             kmatArr[idx] = self.innerVars[indice][:, indice]
@@ -267,22 +267,22 @@ def OKModel(n=8, variogramLayer=None, vecDim=2):
     :param vecDim: integer, the dimension of the vector to be calculated.
     :return: keras' Model object.
     '''
-    mat1 = np.ones((n + 1, n + 1))
+    mat1 = np.ones((n + 1, n + 1),dtype=np.float32)
     mat1[n] = 0
     mat1[:, n] = 0
-    mat1 = tf.constant(mat1)
-    mat2 = np.zeros((n + 1, n + 1))
+    mat1 = tf.constant(mat1, dtype=dtype)
+    mat2 = np.zeros((n + 1, n + 1),dtype=np.float32)
     mat2[n] = 1
     mat2[:, n] = 1
     mat2[n, n] = 0
-    mat2 = tf.constant(mat2)
+    mat2 = tf.constant(mat2, dtype=dtype)
 
-    mat3 = np.ones((n + 1, 1))
+    mat3 = np.ones((n + 1, 1),dtype=np.float32)
     mat3[n] = 0
-    mat3 = tf.constant(mat3)
-    mat4 = np.zeros((n + 1, 1))
+    mat3 = tf.constant(mat3, dtype=dtype)
+    mat4 = np.zeros((n + 1, 1),dtype=np.float32)
     mat4[n] = 1
-    mat4 = tf.constant(mat4)
+    mat4 = tf.constant(mat4, dtype=dtype)
 
     kmat_ = layers.Input(shape=(n + 1, n + 1))
     if variogramLayer != None and variogramLayer.__class__ == NestVariogramLayer:
@@ -395,8 +395,8 @@ class TFOK:
             tree = cKDTree(self.samples[:, :self._i])
             step = batch_size * 3
             num = int(np.ceil(len(points) / step))
-            pros = np.empty((0, 1))
-            sigmas = np.empty((0, 1))
+            pros = np.empty((0, 1),dtype=np.float32)
+            sigmas = np.empty((0, 1),dtype=np.float32)
             init = False
             for i in range(num):
                 begin = i * step
@@ -404,14 +404,14 @@ class TFOK:
                 if end > len(points):
                     end = len(points)
                 if not init or i == num - 1:
-                    kmatArr = np.ones((end - begin, N + 1, N + 1))
+                    kmatArr = np.ones((end - begin, N + 1, N + 1),dtype=np.float32)
                     for j in range(end - begin):
                         kmatArr[j, N, N] = 0.0
                     if isNest:
-                        mvecArr = np.zeros((end - begin, N + 1, self._i))
+                        mvecArr = np.zeros((end - begin, N + 1, self._i),dtype=np.float32)
                     else:
-                        mvecArr = np.ones((end - begin, N + 1))
-                    neighProArr = np.zeros((end - begin, N))
+                        mvecArr = np.ones((end - begin, N + 1),dtype=np.float32)
+                    neighProArr = np.zeros((end - begin, N),dtype=np.float32)
                     init = True
                 points_ = points[begin:end]
                 nbd, nbIdx = tree.query(points_, k=self.N, eps=0.0)
@@ -494,14 +494,14 @@ class TFOK:
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
         L = len(self.samples)
-        kmatArr = np.ones((L, N + 1, N + 1))
+        kmatArr = np.ones((L, N + 1, N + 1),dtype=np.float32)
         for j in range(L):
             kmatArr[j, N, N] = 0.0
         if isNest:
-            mvecArr = np.zeros((L, N + 1, self._i))
+            mvecArr = np.zeros((L, N + 1, self._i),dtype=np.float32)
         else:
-            mvecArr = np.ones((L, N + 1))
-        neighProArr = np.zeros((L, N))
+            mvecArr = np.ones((L, N + 1),dtype=np.float32)
+        neighProArr = np.zeros((L, N),dtype=np.float32)
         for idx, indice in enumerate(nbIdx):
             indice = indice[1:]
             kmatArr[idx, :N, :N] = self.innerVars[indice][:, indice]

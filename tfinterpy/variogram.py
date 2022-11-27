@@ -57,7 +57,7 @@ class VariogramBuilder:
         :param model: str, indicates the variogram function model.
         '''
         self.model = model
-        self.lags = np.array(lags)
+        self.lags = np.array(lags,dtype=np.float32)
         x0, bnds = getX0AndBnds(self.lags[:, 0], self.lags[:, 1], model)
         res = least_squares(resident, x0, bounds=bnds, loss="huber",
                             args=(self.lags[:, 0], self.lags[:, 1], variogramModel(model)))
@@ -96,7 +96,7 @@ class NestVariogram:
     A NestVariogram object is a functor.
     '''
 
-    def __init__(self, variograms, unitVectors):
+    def __init__(self, variograms, unitVectors, weights=None):
         '''
         The nested variational function object is constructed by
         using a number of unit vectors and variograms calculated
@@ -107,6 +107,7 @@ class NestVariogram:
         '''
         self.variograms = variograms
         self.unitVectors = unitVectors
+        self.weights = weights
 
     def __call__(self, vec):
         '''
@@ -116,15 +117,21 @@ class NestVariogram:
         :return: array_like, variogram function value.
         '''
         totalVar = 0
-        for idx, unitVector in enumerate(self.unitVectors):
-            h = np.abs(np.dot(vec, unitVector))
-            var = self.variograms[idx](h)
-            totalVar += var
+        if self.weights is None:
+            for idx, unitVector in enumerate(self.unitVectors):
+                h = np.abs(np.dot(vec, unitVector))
+                var = self.variograms[idx](h)
+                totalVar += var
+        else:
+            for idx, unitVector in enumerate(self.unitVectors):
+                h = np.abs(np.dot(vec, unitVector))
+                var = self.weights[idx] * self.variograms[idx](h)
+                totalVar += var
         return totalVar
 
 
 def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10, lagNum=20, lagInterval=None,
-                                        lagTole=None, bandWidth=None, model=None):
+                                        lagTole=None, bandWidth=None, model=None, calcWeight=False):
     '''
     Calculating the omnidirectional variogram in two dimensions.
 
@@ -146,6 +153,7 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
     :param model: str, specify which variogram function model to use for the fit.
         If model is set to None, fitting will be attempted using all the variogram
         function models in the variogramModel module, and the best fit will be used.
+    :param calcWeight: boolean, Indicates whether the calculation is weighted by direction.
     :return: tuple, (NestVariogram,variogramBuilders).
         NestVariogram is NestVariogram object,
         variogramBuilders is a list of VariogramBuilder objects corresponding to
@@ -161,8 +169,8 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
         azimuth = (i + 0.5) * azimuthStep
         azimuths.append(azimuth)
         unitVectors.append([np.cos(azimuth), np.sin(azimuth)])
-    unitVectors = np.array(unitVectors)
-    azimuths = np.array(azimuths)
+    unitVectors = np.array(unitVectors,dtype=np.float32)
+    azimuths = np.array(azimuths,dtype=np.float32)
     norms = np.linalg.norm(vecs, axis=1) + EPS
     if bandWidth is None:
         bandWidth = norms.mean() / 2
@@ -200,6 +208,7 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
             lagsList[i] = processedBucket[i]
             availableDir.append(i)
     variogramBuilders = []
+    totalLagNum = 0
     if model is None:
         for lags in lagsList:
             if lags is None:
@@ -212,18 +221,28 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
                     minResident = vb.mae
                     best = vb
             variogramBuilders.append(best)
+            totalLagNum += len(lags)
     else:
         for lags in lagsList:
             if lags is None:
                 continue
             vb = VariogramBuilder(lags, model)
             variogramBuilders.append(vb)
-    nestVariogram = NestVariogram([vb.getVariogram() for vb in variogramBuilders], unitVectors[availableDir])
+            totalLagNum += len(lags)
+    weights = None
+    if calcWeight:
+        weights = []
+        for lags in lagsList:
+            if lags is None:
+                continue
+            weights.append(len(lags)/totalLagNum)
+        weights = np.array(weights,dtype=np.float32)
+    nestVariogram = NestVariogram([vb.getVariogram() for vb in variogramBuilders], unitVectors[availableDir], weights)
     return nestVariogram, variogramBuilders
 
 
 def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairNum=10, lagNum=20, lagInterval=None,
-                                        lagTole=None, bandWidth=None, model=None):
+                                        lagTole=None, bandWidth=None, model=None, calcWeight=False):
     '''
     Calculating the omnidirectional variogram in three dimensions.
 
@@ -244,6 +263,7 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
     :param model: str, specify which variogram function model to use for the fit.
         If model is set to None, fitting will be attempted using all the variogram
         function models in the variogramModel module, and the best fit will be used.
+    :param calcWeight: boolean, Indicates whether the calculation is weighted by direction.
     :return: tuple, (NestVariogram,variogramBuilders).
         NestVariogram is NestVariogram object,
         variogramBuilders is a list of VariogramBuilder objects corresponding to
@@ -264,9 +284,9 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
         for j in range(partitionNum[1]):
             b = dips[j]
             unitVectors.append([np.cos(a) * np.cos(b), np.sin(a) * np.cos(b), np.sin(b)])
-    unitVectors = np.array(unitVectors)
-    azimuths = np.array(azimuths)
-    dips = np.array(dips)
+    unitVectors = np.array(unitVectors,dtype=np.float32)
+    # azimuths = np.array(azimuths,dtype=np.float32)
+    # dips = np.array(dips,dtype=np.float32)
     norms = np.linalg.norm(vecs, axis=1) + EPS
     if bandWidth is None:
         bandWidth = norms.mean() / 2
@@ -316,6 +336,7 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
                 lagsList[idx] = processedBucket[i][j]
                 availableDir.append(idx)
     variogramBuilders = []
+    totalLagNum = 0
     if model is None:
         for lags in lagsList:
             if lags is None:
@@ -328,13 +349,23 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
                     minResident = vb.mae
                     best = vb
             variogramBuilders.append(best)
+            totalLagNum += len(lags)
     else:
         for lags in lagsList:
             if lags is None:
                 continue
             vb = VariogramBuilder(lags, model)
             variogramBuilders.append(vb)
-    nestVariogram = NestVariogram([vb.getVariogram() for vb in variogramBuilders], unitVectors[availableDir])
+            totalLagNum += len(lags)
+    weights = None
+    if calcWeight:
+        weights = []
+        for lags in lagsList:
+            if lags is None:
+                continue
+            weights.append(len(lags)/totalLagNum)
+        weights = np.array(weights,dtype=np.float32)
+    nestVariogram = NestVariogram([vb.getVariogram() for vb in variogramBuilders], unitVectors[availableDir], weights)
     return nestVariogram, variogramBuilders
 
 
