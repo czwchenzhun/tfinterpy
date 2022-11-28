@@ -5,6 +5,9 @@ import tensorflow as tf
 from scipy.spatial import cKDTree
 import numpy as np
 from tfinterpy.utils import kSplit
+from multiprocessing import Pool
+from functools import partial
+import warnings
 
 tf.keras.backend.set_floatx('float32')
 
@@ -48,7 +51,7 @@ class TFIDW:
         if mode == '3d' or mode == '3D':
             self._i = 3
 
-    def execute(self, points, N=8, alpha=2, batch_size=1000):
+    def execute(self, points, N=8, alpha=2, batch_size=10000, workerNum=1, device='/CPU:0'):
         '''
         Perform interpolation for points and return result values.
 
@@ -56,28 +59,47 @@ class TFIDW:
         :param N: integer, neighborhood size.
         :param alpha: number, distance power factor.
         :param batch_size: integer, size of each batch of data to be calculated.
+        :param workerNum: By default, one process is used, and multi-process computation is used when wokerNum>1.
+            Notice! If GPU device is specified, the multi-process cannot be enabled.
+        :param device: Specified computing device, default value is '/CPU:0'.
         :return: ndarray, one-dimensional array containing interpolation result.
         '''
-        self.model = IDWModel(N, alpha)
-        tree = cKDTree(self.samples[:, :self._i])
-        step = batch_size * 2
-        num = int(np.ceil(len(points) / step))
-        pros = np.empty((0, 1))
-        for i in range(num):
-            begin = i * step
-            end = (i + 1) * step
-            points_ = points[begin:end]
-            nbd, nbIdx = tree.query(points_, k=N, eps=0.0)
-            hList = []
-            neighProList = []
-            for idx, indice in enumerate(nbIdx):
-                hList.append(nbd[idx])
-                neighProList.append(self.samples[indice, self._i])
-            hArr = np.array(hList,dtype=np.float32)
-            neighProArr = np.array(neighProList,dtype=np.float32)
-            pro = self.model.predict([hArr, neighProArr], batch_size=batch_size)
-            pros = np.append(pros, pro)
-        return pros
+        if workerNum>1:
+            warnings.warn("Multi-process tasks are not recommended when the data volume is small")
+            if 'GPU' in device.upper():
+                warnings.warn("It is not recommended to use the GPU for multi-process tasks, and the speed may actually decrease!")
+            # assert 'GPU' not in device.upper(), "multi-process with GPU is not supported!"
+            pfunc=partial(self.execute,N=N,alpha=alpha,batch_size=batch_size,workerNum=1, device=device)
+            size=int(np.ceil(len(points)//workerNum))+1
+            with Pool(workerNum) as p:
+                result=p.map(pfunc,[points[i*size:(i+1)*size] for i in range(workerNum)])
+            properties=result[0]
+            result.pop(0)
+            while len(result)>0:
+                pro=result.pop(0)
+                properties=np.append(properties,pro)
+            return properties
+        with tf.device(device):
+            self.model = IDWModel(N, alpha)
+            tree = cKDTree(self.samples[:, :self._i])
+            step = batch_size * 1
+            num = int(np.ceil(len(points) / step))
+            pros = np.empty((0, 1))
+            for i in range(num):
+                begin = i * step
+                end = (i + 1) * step
+                points_ = points[begin:end]
+                nbd, nbIdx = tree.query(points_, k=N, eps=0.0)
+                hList = []
+                neighProList = []
+                for idx, indice in enumerate(nbIdx):
+                    hList.append(nbd[idx])
+                    neighProList.append(self.samples[indice, self._i])
+                hArr = np.array(hList,dtype=np.float32)
+                neighProArr = np.array(neighProList,dtype=np.float32)
+                pro = self.model.predict([hArr, neighProArr], batch_size=batch_size)
+                pros = np.append(pros, pro)
+            return pros
 
     def crossValidateKFold(self, K=10, N=8, alpha=2):
         '''

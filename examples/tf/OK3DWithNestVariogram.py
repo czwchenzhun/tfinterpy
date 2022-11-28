@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     # Create linear 3D grid.
     grid = Grid3D()
-    grid.rectlinear((100, 100, 100), (samples[:, 0].min(), samples[:, 0].max()),
+    grid.rectlinear((1000, 100, 100), (samples[:, 0].min(), samples[:, 0].max()),
                     (samples[:, 1].min(), samples[:, 1].max()), (samples[:, 2].min(), samples[:, 2].max()))
 
     # Calculate nested variation function.

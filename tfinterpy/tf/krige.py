@@ -9,6 +9,7 @@ from tfinterpy.tf.variogramLayer import NestVariogramLayer, dtype
 from numba import jit
 from multiprocessing import Pool
 from functools import partial
+import warnings
 
 # tf.keras.backend.set_floatx('float32')
 
@@ -97,7 +98,11 @@ class TFSK:
             The first ndarray representing the interpolation result,
             the second ndarray representing the kriging variance.
         '''
-        if workerNum>1 and not 'GPU' in device.upper():
+        if workerNum>1:
+            warnings.warn("Multi-process tasks are not recommended when the data volume is small")
+            if 'GPU' in device.upper():
+                warnings.warn("It is not recommended to use the GPU for multi-process tasks, and the speed may actually decrease!")
+            # assert 'GPU' not in device.upper(), "multi-process with GPU is not supported!"
             pfunc=partial(self.execute,N=N,variogramLayer=variogramLayer,batch_size=batch_size,workerNum=1, device=device)
             size=int(np.ceil(len(points)//workerNum))+1
             with Pool(workerNum) as p:
@@ -363,7 +368,11 @@ class TFOK:
             The first ndarray representing the interpolation result,
             the second ndarray representing the kriging variance.
         '''
-        if workerNum>1 and not 'GPU' in device.upper():
+        if workerNum>1:
+            warnings.warn("Multi-process tasks are not recommended when the data volume is small")
+            if 'GPU' in device.upper():
+                warnings.warn("It is not recommended to use the GPU for multi-process tasks, and the speed may actually decrease!")
+            # assert 'GPU' not in device.upper(), "multi-process with GPU is not supported!"
             pfunc=partial(self.execute,N=N,variogramLayer=variogramLayer,batch_size=batch_size,workerNum=1, device=device)
             size=int(np.ceil(len(points)//workerNum))+1
             with Pool(workerNum) as p:

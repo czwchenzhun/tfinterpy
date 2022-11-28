@@ -22,10 +22,8 @@ if __name__ == "__main__":
                     (samples[:, 1].min(), samples[:, 1].max()), (samples[:, 2].min(), samples[:, 2].max()))
     exe = TFIDW(samples, '3d')# Create a idw interpolator.
 
-    # Specify the GPU to be used.
-    with tf.device("/GPU:0"):
-        # Perform interpolation of all points in the grid.
-        grid.pro = exe.execute(grid.points(), N)
+    # Perform interpolation of all points in the grid.
+    grid.pro = exe.execute(grid.points(), N, batch_size=5000, workerNum=2, device="/CPU:0")
 
     print(exe.crossValidate(N))# Perform leave-one-out validation and print result.
     print(exe.crossValidateKFold(10, N))# Perform k-fold validation and print result.
