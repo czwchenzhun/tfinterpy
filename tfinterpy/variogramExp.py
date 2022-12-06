@@ -1,6 +1,8 @@
 import numpy as np
+from tfinterpy.settings import dtype
 
 EPS = 1e-16
+
 
 def search2d(vecs, vars, lagNum, lagInterval, lagTole, angle, angleTole, bandWidth):
     '''
@@ -18,7 +20,7 @@ def search2d(vecs, vars, lagNum, lagInterval, lagTole, angle, angleTole, bandWid
         processedLags is the mean-processed lags.
         lags is original searched lags.
     '''
-    unitVector = np.array([np.cos(angle), np.sin(angle)],dtype=np.float32)
+    unitVector = np.array([np.cos(angle), np.sin(angle)], dtype=dtype)
     return searchLags(vecs, vars, lagNum, lagInterval, lagTole, unitVector, angleTole, bandWidth)
 
 
@@ -38,7 +40,7 @@ def search3d(vecs, vars, lagNum, lagInterval, lagTole, azimuth, dip, angleTole, 
         processedLags is the mean-processed lags.
         lags is original searched lags.
     '''
-    unitVector = np.array([np.cos(azimuth) * np.cos(dip), np.sin(azimuth) * np.cos(dip), np.sin(dip)],dtype=np.float32)
+    unitVector = np.array([np.cos(azimuth) * np.cos(dip), np.sin(azimuth) * np.cos(dip), np.sin(dip)], dtype=dtype)
     return searchLags(vecs, vars, lagNum, lagInterval, lagTole, unitVector, angleTole, bandWidth)
 
 
@@ -85,7 +87,7 @@ def searchLags(vecs, vars, lagNum, lagInterval, lagTole, unitVector, angleTole, 
                 break
     processedLags = []
     for ls in lags:
-        if len(ls)==0:
+        if len(ls) == 0:
             continue
         mean = np.mean(ls, axis=0)
         if np.isnan(mean).any():

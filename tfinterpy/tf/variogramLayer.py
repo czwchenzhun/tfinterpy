@@ -1,8 +1,9 @@
 import tensorflow as tf
 from tensorflow.keras import layers
+from tfinterpy.settings import dtype
 
-tf.keras.backend.set_floatx('float32')
-dtype=tf.float32
+tf.keras.backend.set_floatx(dtype)
+
 
 class LinearLayer(layers.Layer):
     '''

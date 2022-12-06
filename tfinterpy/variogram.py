@@ -1,10 +1,12 @@
 from tfinterpy.utils import *
+from tfinterpy.settings import dtype
 from tfinterpy.variogramExp import search2d, search3d
 from tfinterpy.variogramModel import variogramModel, VariogramModelMap
 from scipy.optimize import least_squares
 from functools import partial
 
 EPS = 1e-16
+
 
 def resident(params, x, y, variogram_function):
     '''
@@ -57,7 +59,7 @@ class VariogramBuilder:
         :param model: str, indicates the variogram function model.
         '''
         self.model = model
-        self.lags = np.array(lags,dtype=np.float32)
+        self.lags = np.array(lags, dtype=dtype)
         x0, bnds = getX0AndBnds(self.lags[:, 0], self.lags[:, 1], model)
         res = least_squares(resident, x0, bounds=bnds, loss="huber",
                             args=(self.lags[:, 0], self.lags[:, 1], variogramModel(model)))
@@ -85,8 +87,8 @@ class VariogramBuilder:
         Get variogram function(closure function).
         :return: function.
         '''
-        func=variogramModel(self.model)
-        pfunc=partial(func,*self.params)
+        func = variogramModel(self.model)
+        pfunc = partial(func, *self.params)
         return pfunc
 
 
@@ -169,8 +171,8 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
         azimuth = (i + 0.5) * azimuthStep
         azimuths.append(azimuth)
         unitVectors.append([np.cos(azimuth), np.sin(azimuth)])
-    unitVectors = np.array(unitVectors,dtype=np.float32)
-    azimuths = np.array(azimuths,dtype=np.float32)
+    unitVectors = np.array(unitVectors, dtype=dtype)
+    azimuths = np.array(azimuths, dtype=dtype)
     norms = np.linalg.norm(vecs, axis=1) + EPS
     if bandWidth is None:
         bandWidth = norms.mean() / 2
@@ -235,8 +237,8 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
         for lags in lagsList:
             if lags is None:
                 continue
-            weights.append(len(lags)/totalLagNum)
-        weights = np.array(weights,dtype=np.float32)
+            weights.append(len(lags) / totalLagNum)
+        weights = np.array(weights, dtype=dtype)
     nestVariogram = NestVariogram([vb.getVariogram() for vb in variogramBuilders], unitVectors[availableDir], weights)
     return nestVariogram, variogramBuilders
 
@@ -284,7 +286,7 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
         for j in range(partitionNum[1]):
             b = dips[j]
             unitVectors.append([np.cos(a) * np.cos(b), np.sin(a) * np.cos(b), np.sin(b)])
-    unitVectors = np.array(unitVectors,dtype=np.float32)
+    unitVectors = np.array(unitVectors, dtype=dtype)
     # azimuths = np.array(azimuths,dtype=np.float32)
     # dips = np.array(dips,dtype=np.float32)
     norms = np.linalg.norm(vecs, axis=1) + EPS
@@ -363,8 +365,8 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
         for lags in lagsList:
             if lags is None:
                 continue
-            weights.append(len(lags)/totalLagNum)
-        weights = np.array(weights,dtype=np.float32)
+            weights.append(len(lags) / totalLagNum)
+        weights = np.array(weights, dtype=dtype)
     nestVariogram = NestVariogram([vb.getVariogram() for vb in variogramBuilders], unitVectors[availableDir], weights)
     return nestVariogram, variogramBuilders
 

@@ -2,8 +2,10 @@ from scipy.spatial import cKDTree
 import numpy as np
 from tfinterpy.utils import kSplit, calcVecs
 from tfinterpy.variogram import NestVariogram
+from tfinterpy.settings import dtype
 from multiprocessing import Pool
 from functools import partial
+
 
 class SK:
     '''
@@ -39,19 +41,19 @@ class SK:
             The first ndarray representing the interpolation result,
             the second ndarray representing the kriging variance.
         '''
-        if workerNum>1:
-            pfunc=partial(self.execute,N=N,variogram=variogram,workerNum=1)
-            size=int(np.ceil(len(points)//workerNum))+1
+        if workerNum > 1:
+            pfunc = partial(self.execute, N=N, variogram=variogram, workerNum=1)
+            size = int(np.ceil(len(points) // workerNum)) + 1
             with Pool(workerNum) as p:
-                result=p.map(pfunc,[points[i*size:(i+1)*size] for i in range(workerNum)])
-            properties=result[0][0]
-            sigmas=result[0][1]
+                result = p.map(pfunc, [points[i * size:(i + 1) * size] for i in range(workerNum)])
+            properties = result[0][0]
+            sigmas = result[0][1]
             result.pop(0)
-            while len(result)>0:
-                pro,sig=result.pop(0)
-                properties=np.append(properties,pro)
-                sigmas=np.append(sigmas,sig)
-            return properties,sigmas
+            while len(result) > 0:
+                pro, sig = result.pop(0)
+                properties = np.append(properties, pro)
+                sigmas = np.append(sigmas, sig)
+            return properties, sigmas
         if self.innerVecs is None:
             self.__calcInnerVecs__()
         if variogram is None:
@@ -67,8 +69,8 @@ class SK:
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(points, k=N, eps=0.0)
-        properties = np.zeros((len(points)),dtype=np.float32)
-        sigmas = np.zeros((len(points)),dtype=np.float32)
+        properties = np.zeros((len(points)), dtype=dtype)
+        sigmas = np.zeros((len(points)), dtype=dtype)
         for idx, indice in enumerate(nbIdx):
             kmat = self.innerVars[indice][:, indice]
             if variogram.__class__ == NestVariogram:
@@ -147,7 +149,7 @@ class SK:
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        properties = np.zeros((len(self.samples)),dtype=np.float32)
+        properties = np.zeros((len(self.samples)), dtype=dtype)
         for idx, indice in enumerate(nbIdx):
             indice = indice[1:]
             kmat = self.innerVars[indice][:, indice]
@@ -212,19 +214,19 @@ class OK:
             The first ndarray representing the interpolation result,
             the second ndarray representing the kriging variance.
         '''
-        if workerNum>1:
-            pfunc=partial(self.execute,N=N,variogram=variogram,workerNum=1)
-            size=int(np.ceil(len(points)//workerNum))+1
+        if workerNum > 1:
+            pfunc = partial(self.execute, N=N, variogram=variogram, workerNum=1)
+            size = int(np.ceil(len(points) // workerNum)) + 1
             with Pool(workerNum) as p:
-                result=p.map(pfunc,[points[i*size:(i+1)*size] for i in range(workerNum)])
-            properties=result[0][0]
-            sigmas=result[0][1]
+                result = p.map(pfunc, [points[i * size:(i + 1) * size] for i in range(workerNum)])
+            properties = result[0][0]
+            sigmas = result[0][1]
             result.pop(0)
-            while len(result)>0:
-                pro,sig=result.pop(0)
-                properties=np.append(properties,pro)
-                sigmas=np.append(sigmas,sig)
-            return properties,sigmas
+            while len(result) > 0:
+                pro, sig = result.pop(0)
+                properties = np.append(properties, pro)
+                sigmas = np.append(sigmas, sig)
+            return properties, sigmas
         if self.innerVecs is None:
             self.__calcInnerVecs__()
         if variogram is None:
@@ -240,11 +242,11 @@ class OK:
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(points, k=N, eps=0.0)
-        properties = np.zeros((len(points)),dtype=np.float32)
-        sigmas = np.zeros((len(points)),dtype=np.float32)
-        kmat = np.ones((N + 1, N + 1),dtype=np.float32)
+        properties = np.zeros((len(points)), dtype=dtype)
+        sigmas = np.zeros((len(points)), dtype=dtype)
+        kmat = np.ones((N + 1, N + 1), dtype=dtype)
         kmat[N, N] = 0.0
-        mvec = np.ones((N + 1,),dtype=np.float32)
+        mvec = np.ones((N + 1,), dtype=dtype)
         for idx, indice in enumerate(nbIdx):
             kmat[:N, :N] = self.innerVars[indice][:, indice]
             if variogram.__class__ == NestVariogram:
@@ -323,10 +325,10 @@ class OK:
 
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        properties = np.zeros((len(self.samples)),dtype=np.float32)
-        kmat = np.ones((N + 1, N + 1),dtype=np.float32)
+        properties = np.zeros((len(self.samples)), dtype=dtype)
+        kmat = np.ones((N + 1, N + 1), dtype=dtype)
         kmat[N, N] = 0.0
-        mvec = np.ones((N + 1,),dtype=np.float32)
+        mvec = np.ones((N + 1,), dtype=dtype)
         for idx, indice in enumerate(nbIdx):
             indice = indice[1:]
             kmat[:N, :N] = self.innerVars[indice][:, indice]

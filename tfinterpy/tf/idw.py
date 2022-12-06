@@ -5,11 +5,12 @@ import tensorflow as tf
 from scipy.spatial import cKDTree
 import numpy as np
 from tfinterpy.utils import kSplit
+from tfinterpy.settings import dtype
 from multiprocessing import Pool
 from functools import partial
 import warnings
 
-tf.keras.backend.set_floatx('float32')
+tf.keras.backend.set_floatx(dtype)
 
 def IDWModel(n=8, alpha=2):
     '''

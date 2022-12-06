@@ -5,34 +5,73 @@ from tensorflow.keras.models import Model
 from scipy.spatial import cKDTree
 import numpy as np
 from tfinterpy.utils import kSplit, calcVecs
-from tfinterpy.tf.variogramLayer import NestVariogramLayer, dtype
-from numba import jit
+from tfinterpy.tf.variogramLayer import NestVariogramLayer
+from tfinterpy.settings import dtype
 from multiprocessing import Pool
 from functools import partial
 import warnings
 
-# tf.keras.backend.set_floatx('float32')
+tf.keras.backend.set_floatx(dtype)
 
-def SKModel(n=8, variogramLayer=None, vecDim=2):
+class KMatLayer(layers.Layer):
+    def __init__(self, innerVars):
+        super(KMatLayer,self).__init__()
+        self.innerVars = innerVars
+
+    @tf.function(jit_compile=True)
+    def call(self,indices):
+        return tf.vectorized_map(lambda indice: tf.gather(tf.gather(self.innerVars, indice), indice, axis=1), indices)
+
+class MVecLayer(layers.Layer):
+    def __init__(self, sampleLocs):
+        super(MVecLayer,self).__init__()
+        self.sampleLocs = sampleLocs
+
+    @tf.function(jit_compile=True)
+    def call(self,indices, points):
+        return tf.vectorized_map(lambda i: tf.gather(self.sampleLocs, indices[i]) - points[i], tf.range(tf.shape(indices)[0]))
+
+class IndiceLayer(layers.Layer):
+    def __init__(self, data):
+        super(IndiceLayer, self).__init__()
+        self.data = data
+
+    @tf.function(jit_compile=True)
+    def call(self, indices):
+        return tf.vectorized_map(lambda indice: tf.gather(self.data, indice), indices)
+
+class BatchConcatenate(layers.Layer):
+    def __init__(self):
+        super(BatchConcatenate, self).__init__()
+
+    @tf.function(jit_compile=True)
+    def call(self, x, y, axis=0):
+        return tf.vectorized_map(lambda a:tf.concat([a,y], axis), x)
+
+def SKModel(innerVars, sampleLocs, samplePros, n=8, variogramLayer=None):
     '''
     Construction a keras model for Simple Kriging algorithm.
 
+    :param innerVars: ndarray, the square of the difference between the sampling point properties.
+    :param sampleLocs: ndarray, sampling point coordinates.
+    :param samplePros: ndarray, sampling point properties.
     :param n: integer, neighborhood size.
     :param variogramLayer: keras' layer, layer representing a variogram function.
-    :param vecDim: integer, the dimension of the vector to be calculated.
     :return: keras' Model object.
     '''
-    kmat = layers.Input(shape=(n, n))
-    if variogramLayer != None and variogramLayer.__class__ == NestVariogramLayer:
-        mvec_ = layers.Input(shape=(n, vecDim))
-    else:
-        mvec_ = layers.Input(shape=(n))
-    pro = layers.Input(shape=(n))
+    innerVars = tf.convert_to_tensor(innerVars)
+    sampleLocs = tf.convert_to_tensor(sampleLocs)
+    samplePros = tf.convert_to_tensor(samplePros)
+    indices=layers.Input(shape=(n,), dtype=tf.int32)
+    points=layers.Input(shape=(sampleLocs.shape[1],))
+    kmat=KMatLayer(innerVars)(indices)
+    mvec=MVecLayer(sampleLocs)(indices, points)
+    pro=IndiceLayer(samplePros)(indices)
     if variogramLayer != None:
-        mvec = variogramLayer(mvec_)
+        mvec = variogramLayer(mvec)
     else:
-        mvec = mvec_
-    mvec = layers.Reshape((n, 1))(mvec)
+        mvec = tf.linalg.norm(mvec, axis=2)
+        mvec = layers.Reshape((n, 1))(mvec)
     kmatInv = tf.linalg.pinv(kmat)
     lambvec = layers.Dot(1)([kmatInv, mvec])
     estimate = layers.Dot(1)([pro, lambvec])
@@ -44,9 +83,8 @@ def SKModel(n=8, variogramLayer=None, vecDim=2):
     lambvec = layers.Reshape((n,))(lambvec)
     mvec = layers.Reshape((n,))(mvec)
     sigma = layers.Dot(1)([lambvec, mvec])
-    model = Model(inputs=[kmat, mvec_, pro], outputs=[estimate, sigma])
+    model = Model(inputs=[indices, points], outputs=[estimate, sigma])
     return model
-
 
 class TFSK:
     '''
@@ -62,26 +100,15 @@ class TFSK:
             For the case of three-dimensional interpolation, where each item is represented by [x,y,z,property].
         :param mode: str, '2d' or '3d'.
         '''
-        self.samples = samples
+        if samples.dtype!=dtype:
+            self.samples = samples.astype(dtype)
+        else:
+            self.samples = samples
         self.mode = mode
         self._i = 2
         if mode.lower() == '3d':
             self._i = 3
         self.innerVecs = None
-
-    @jit(nopython=True)
-    def __assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, innerVars, samples, dim):
-        for idx, indice in enumerate(nbIdx):
-            kmatArr[idx] = innerVars[indice][:, indice]
-            mvecArr[idx] = nbd[idx]
-            neighProArr[idx] = samples[indice, dim]
-
-    @jit(nopython=True)
-    def __assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, innerVars, samples, points, dim):
-        for idx, indice in enumerate(nbIdx):
-            kmatArr[idx] = innerVars[indice][:, indice]
-            mvecArr[idx] = samples[indice, :dim] - points[idx]
-            neighProArr[idx] = samples[indice, dim]
 
     def execute(self, points, N=8, variogramLayer=None, batch_size=10000, workerNum=1, device='/CPU:0'):
         '''
@@ -117,7 +144,6 @@ class TFSK:
             return properties,sigmas
         with tf.device(device):
             self.N = N
-            self.model = SKModel(N, variogramLayer, self._i)
             isNest = variogramLayer.__class__ == NestVariogramLayer
             if self.innerVecs is None:
                 self.__calcInnerVecs__()
@@ -131,39 +157,20 @@ class TFSK:
             if self.innerVars.shape[-1] == 1:
                 self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
 
+            self.model = SKModel(self.innerVars, self.samples[:,:self._i], self.samples[:, self._i], N, variogramLayer)
             tree = cKDTree(self.samples[:, :self._i])
             step = batch_size * 3
             num = int(np.ceil(len(points) / step))
             pros = np.empty((0, 1),dtype=np.float32)
             sigmas = np.empty((0, 1),dtype=np.float32)
-            init = False
             for i in range(num):
                 begin = i * step
                 end = (i + 1) * step
                 if end > len(points):
                     end = len(points)
-                if not init or i == num - 1:
-                    kmatArr = np.zeros((end - begin, N, N),dtype=np.float32)
-                    if isNest:
-                        mvecArr = np.zeros((end - begin, N, self._i),dtype=np.float32)
-                    else:
-                        mvecArr = np.zeros((end - begin, N),dtype=np.float32)
-                    neighProArr = np.zeros((end - begin, N),dtype=np.float32)
-                    init = True
                 points_ = points[begin:end]
-                nbd, nbIdx = tree.query(points_, k=N, eps=0.0)
-                # for idx, indice in enumerate(nbIdx):
-                #     kmatArr[idx] = self.innerVars[indice][:, indice]
-                #     if isNest:
-                #         mvecArr[idx] = self.samples[indice, :self._i] - points_[idx]
-                #     else:
-                #         mvecArr[idx] = nbd[idx]
-                #     neighProArr[idx] = self.samples[indice, self._i]
-                if isNest:
-                    TFSK.__assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, points_, self._i)
-                else:
-                    TFSK.__assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, self._i)
-                pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
+                _, nbIdx = tree.query(points_, k=N, eps=0.0)
+                pro, sigma = self.model.predict([nbIdx, points_], batch_size=batch_size)
                 pros = np.append(pros, pro)
                 sigmas = np.append(sigmas, sigma)
         return pros, sigmas
@@ -214,7 +221,6 @@ class TFSK:
         :return: tuple, tuple containing absolute mean error, absolute standard deviation error and origin error(ndarray).
         '''
         self.N = N
-        self.model = SKModel(N, variogramLayer, self._i)
         isNest = variogramLayer.__class__ == NestVariogramLayer
         if self.innerVecs is None:
             self.__calcInnerVecs__()
@@ -227,25 +233,10 @@ class TFSK:
             self.innerVars = variogramLayer(self.innerVars).numpy()
         if self.innerVars.shape[-1] == 1:
             self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
-
+        self.model = SKModel(self.innerVars, self.samples[:, :self._i], self.samples[:, self._i], N, variogramLayer)
         tree = cKDTree(self.samples[:, :self._i])
-        nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        L = len(self.samples)
-        kmatArr = np.zeros((L, N, N),dtype=np.float32)
-        if isNest:
-            mvecArr = np.zeros((L, N, self._i),dtype=np.float32)
-        else:
-            mvecArr = np.zeros((L, N),dtype=np.float32)
-        neighProArr = np.zeros((L, N),dtype=np.float32)
-        for idx, indice in enumerate(nbIdx):
-            indice = indice[1:]
-            kmatArr[idx] = self.innerVars[indice][:, indice]
-            if isNest:
-                mvecArr[idx] = self.samples[indice, :self._i] - self.samples[idx, :self._i]
-            else:
-                mvecArr[idx] = nbd[idx][1:]
-            neighProArr[idx] = self.samples[indice, self._i]
-        pros, _ = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=10000)
+        _, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
+        pros, _ = self.model.predict([nbIdx[:, 1:], self.samples[:, :self._i]], batch_size=10000)
         pros = pros.reshape(-1)
         error = pros - self.samples[:, self._i]
         absError = np.abs(error)
@@ -262,60 +253,56 @@ class TFSK:
         innerVecs = calcVecs(self.samples[:, :self._i], includeSelf=True)
         self.innerVecs = innerVecs.reshape((self.samples.shape[0], self.samples.shape[0], self._i))
 
-
-def OKModel(n=8, variogramLayer=None, vecDim=2):
+def OKModel(innerVars, sampleLocs, samplePros, n=8, variogramLayer=None):
     '''
     Construction a keras model for Ordinary Kriging algorithm.
 
+    :param innerVars: ndarray, the square of the difference between the sampling point properties.
+    :param sampleLocs: ndarray, sampling point coordinates.
+    :param samplePros: ndarray, sampling point properties.
     :param n: integer, neighborhood size.
     :param variogramLayer: keras' layer, layer representing a variogram function.
-    :param vecDim: integer, the dimension of the vector to be calculated.
     :return: keras' Model object.
     '''
-    mat1 = np.ones((n + 1, n + 1),dtype=np.float32)
-    mat1[n] = 0
-    mat1[:, n] = 0
+    mat1 = np.ones((n + 1, n + 1),dtype=dtype)
+    mat1[n, n] = 0
     mat1 = tf.constant(mat1, dtype=dtype)
-    mat2 = np.zeros((n + 1, n + 1),dtype=np.float32)
-    mat2[n] = 1
-    mat2[:, n] = 1
-    mat2[n, n] = 0
-    mat2 = tf.constant(mat2, dtype=dtype)
 
-    mat3 = np.ones((n + 1, 1),dtype=np.float32)
-    mat3[n] = 0
-    mat3 = tf.constant(mat3, dtype=dtype)
-    mat4 = np.zeros((n + 1, 1),dtype=np.float32)
-    mat4[n] = 1
-    mat4 = tf.constant(mat4, dtype=dtype)
+    tmp = np.ones((innerVars.shape[0] + 1, innerVars.shape[0] + 1), dtype=dtype)
+    tmp[:innerVars.shape[0], :innerVars.shape[0]] = innerVars
+    innerVars = tmp
 
-    kmat_ = layers.Input(shape=(n + 1, n + 1))
-    if variogramLayer != None and variogramLayer.__class__ == NestVariogramLayer:
-        mvec_ = layers.Input(shape=(n + 1, vecDim))
-    else:
-        mvec_ = layers.Input(shape=(n + 1))
-    pro = layers.Input(shape=(n,))
+    innerVars = tf.convert_to_tensor(innerVars)
+    sampleLocs = tf.convert_to_tensor(sampleLocs)
+    samplePros = tf.convert_to_tensor(samplePros)
+
+    indices = layers.Input(shape=(n,), dtype="int32")
+    points = layers.Input(shape=(sampleLocs.shape[1],))
+
+    mvec = MVecLayer(sampleLocs)(indices, points)
+    pro = IndiceLayer(samplePros)(indices)
+
+    tmp2 = tf.zeros((1,),dtype="int32")
+    tmp2 = tmp2 + (innerVars.shape[0]-1)
+
+    indices_ = BatchConcatenate()(indices, tmp2)
+    kmat = KMatLayer(innerVars)(indices_)
+    kmat = kmat * mat1
+
     if variogramLayer != None:
-        mvec = variogramLayer(mvec_)
-        mvec = layers.Reshape((n + 1, 1))(mvec)
-
-        kmat = kmat_
-        kmat = kmat * mat1
-        kmat = kmat + mat2
-        mvec = mvec * mat3
-        mvec = mvec + mat4
+        mvec = variogramLayer(mvec)
+        mvec = BatchConcatenate()(mvec, tf.ones((1, 1), dtype=dtype))
     else:
-        kmat = kmat_
-        mvec = mvec_
+        mvec = tf.linalg.norm(mvec, axis=2)
+        mvec = BatchConcatenate()(mvec, tf.ones((1,), dtype=dtype))
         mvec = layers.Reshape((n + 1, 1))(mvec)
     kmatInv = tf.linalg.pinv(kmat)
     lambvec = layers.Dot(1)([kmatInv, mvec])
     estimate = layers.Dot(1)([pro, lambvec[:, :n]])
-
     lambvec = layers.Reshape((n + 1,))(lambvec)
     mvec = layers.Reshape((n + 1,))(mvec)
     sigma = layers.Dot(1)([lambvec, mvec])
-    model = Model(inputs=[kmat_, mvec_, pro], outputs=[estimate, sigma])
+    model = Model(inputs=[indices, points], outputs=[estimate, sigma])
     return model
 
 class TFOK:
@@ -332,26 +319,15 @@ class TFOK:
             For the case of three-dimensional interpolation, where each item is represented by [x,y,z,property].
         :param mode: str, '2d' or '3d'.
         '''
-        self.samples = samples
+        if samples.dtype!=dtype:
+            self.samples = samples.astype(dtype)
+        else:
+            self.samples = samples
         self.mode = mode
         self._i = 2
         if mode.lower() == '3d':
             self._i = 3
         self.innerVecs = None
-
-    @jit(nopython=True)
-    def __assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, innerVars, samples, N, dim):
-        for idx, indice in enumerate(nbIdx):
-            kmatArr[idx, :N, :N] = innerVars[indice][:, indice]
-            mvecArr[idx, :N] = nbd[idx]
-            neighProArr[idx] = samples[indice, dim]
-
-    @jit(nopython=True)
-    def __assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, innerVars, samples, points, N, dim):
-        for idx, indice in enumerate(nbIdx):
-            kmatArr[idx, :N, :N] = innerVars[indice][:, indice]
-            mvecArr[idx, :N] = samples[indice, :dim] - points[idx]
-            neighProArr[idx] = samples[indice, dim]
 
     def execute(self, points, N=8, variogramLayer=None, batch_size=10000, workerNum=1, device='/CPU:0'):
         '''
@@ -387,7 +363,6 @@ class TFOK:
             return properties,sigmas
         with tf.device(device):
             self.N = N
-            self.model = OKModel(N, variogramLayer, self._i)
             isNest = variogramLayer.__class__ == NestVariogramLayer
             if self.innerVecs is None:
                 self.__calcInnerVecs__()
@@ -401,41 +376,20 @@ class TFOK:
             if self.innerVars.shape[-1] == 1:
                 self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
 
+            self.model = OKModel(self.innerVars, self.samples[:,:self._i], self.samples[:,self._i], N, variogramLayer)
             tree = cKDTree(self.samples[:, :self._i])
             step = batch_size * 3
             num = int(np.ceil(len(points) / step))
             pros = np.empty((0, 1),dtype=np.float32)
             sigmas = np.empty((0, 1),dtype=np.float32)
-            init = False
             for i in range(num):
                 begin = i * step
                 end = (i + 1) * step
                 if end > len(points):
                     end = len(points)
-                if not init or i == num - 1:
-                    kmatArr = np.ones((end - begin, N + 1, N + 1),dtype=np.float32)
-                    for j in range(end - begin):
-                        kmatArr[j, N, N] = 0.0
-                    if isNest:
-                        mvecArr = np.zeros((end - begin, N + 1, self._i),dtype=np.float32)
-                    else:
-                        mvecArr = np.ones((end - begin, N + 1),dtype=np.float32)
-                    neighProArr = np.zeros((end - begin, N),dtype=np.float32)
-                    init = True
                 points_ = points[begin:end]
-                nbd, nbIdx = tree.query(points_, k=self.N, eps=0.0)
-                # for idx, indice in enumerate(nbIdx):
-                #     kmatArr[idx, :N, :N] = self.innerVars[indice][:, indice]
-                #     if isNest:
-                #         mvecArr[idx, :N] = self.samples[indice, :self._i] - points_[idx]
-                #     else:
-                #         mvecArr[idx, :N] = nbd[idx]
-                #     neighProArr[idx] = self.samples[indice, self._i]
-                if isNest:
-                    TFOK.__assignNest__(nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, points_, N, self._i)
-                else:
-                    TFOK.__assign__(nbd, nbIdx, kmatArr, mvecArr, neighProArr, self.innerVars, self.samples, N, self._i)
-                pro, sigma = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=batch_size)
+                _, nbIdx = tree.query(points_, k=self.N, eps=0.0)
+                pro, sigma = self.model.predict([nbIdx, points_], batch_size=batch_size)
                 pros = np.append(pros, pro)
                 sigmas = np.append(sigmas, sigma)
         return pros, sigmas
@@ -486,7 +440,6 @@ class TFOK:
         :return: tuple, tuple containing absolute mean error, absolute standard deviation error and origin error(ndarray).
         '''
         self.N = N
-        self.model = OKModel(N, variogramLayer, self._i)
         isNest = variogramLayer.__class__ == NestVariogramLayer
         if self.innerVecs is None:
             self.__calcInnerVecs__()
@@ -499,27 +452,10 @@ class TFOK:
             self.innerVars = variogramLayer(self.innerVars).numpy()
         if self.innerVars.shape[-1] == 1:
             self.innerVars = self.innerVars.reshape(self.innerVars.shape[:-1])
-
+        self.model = OKModel(self.innerVars, self.samples[:, :self._i], self.samples[:, self._i], N, variogramLayer)
         tree = cKDTree(self.samples[:, :self._i])
-        nbd, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        L = len(self.samples)
-        kmatArr = np.ones((L, N + 1, N + 1),dtype=np.float32)
-        for j in range(L):
-            kmatArr[j, N, N] = 0.0
-        if isNest:
-            mvecArr = np.zeros((L, N + 1, self._i),dtype=np.float32)
-        else:
-            mvecArr = np.ones((L, N + 1),dtype=np.float32)
-        neighProArr = np.zeros((L, N),dtype=np.float32)
-        for idx, indice in enumerate(nbIdx):
-            indice = indice[1:]
-            kmatArr[idx, :N, :N] = self.innerVars[indice][:, indice]
-            if isNest:
-                mvecArr[idx, :N] = self.samples[indice, :self._i] - self.samples[idx, :self._i]
-            else:
-                mvecArr[idx, :N] = nbd[idx][1:]
-            neighProArr[idx] = self.samples[indice, self._i]
-        pros, _ = self.model.predict([kmatArr, mvecArr, neighProArr], batch_size=10000)
+        _, nbIdx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
+        pros, _ = self.model.predict([nbIdx[:, 1:], self.samples[:, :self._i]], batch_size=10000)
         pros = pros.reshape(-1)
         error = pros - self.samples[:, self._i]
         absError = np.abs(error)

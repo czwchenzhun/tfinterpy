@@ -1,8 +1,10 @@
 from tfinterpy.utils import kSplit
+from tfinterpy.settings import dtype
 import numpy as np
 from scipy.spatial import cKDTree
 from multiprocessing import Pool
 from functools import partial
+
 
 class IDW:
     '''
@@ -34,20 +36,20 @@ class IDW:
         :param workerNum: By default, one process is used, and multi-process computation is used when wokerNum>1.
         :return: ndarray, one-dimensional array containing interpolation result.
         '''
-        if workerNum>1:
-            pfunc=partial(self.execute,N=N,alpha=alpha,workerNum=1)
-            size=int(np.ceil(len(points)//workerNum))+1
+        if workerNum > 1:
+            pfunc = partial(self.execute, N=N, alpha=alpha, workerNum=1)
+            size = int(np.ceil(len(points) // workerNum)) + 1
             with Pool(workerNum) as p:
-                result=p.map(pfunc,[points[i*size:(i+1)*size] for i in range(workerNum)])
-            properties=result[0]
+                result = p.map(pfunc, [points[i * size:(i + 1) * size] for i in range(workerNum)])
+            properties = result[0]
             result.pop(0)
-            while len(result)>0:
-                pro=result.pop(0)
-                properties=np.append(properties,pro)
+            while len(result) > 0:
+                pro = result.pop(0)
+                properties = np.append(properties, pro)
             return properties
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nbIdx = tree.query(points, k=N, eps=0.0)
-        properties = np.zeros((len(points)),dtype=np.float32)
+        properties = np.zeros((len(points)), dtype=dtype)
         for idx, indice in enumerate(nbIdx):
             hs = nbd[idx]
             hs = hs ** alpha
@@ -105,7 +107,7 @@ class IDW:
         '''
         tree = cKDTree(self.samples[:, :self._i])
         nbd, nb_idx = tree.query(self.samples[:, :self._i], k=N + 1, eps=0.0)
-        properties = np.zeros((len(self.samples)),dtype=np.float32)
+        properties = np.zeros((len(self.samples)), dtype=dtype)
         for idx, indice in enumerate(nb_idx):
             indice = indice[1:]
             hs = nbd[idx][1:]
