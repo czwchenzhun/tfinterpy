@@ -1,3 +1,4 @@
-from tfinterpy import sk, ok
+from tfinterpy.sk import *
+from tfinterpy.ok import *
 
 
