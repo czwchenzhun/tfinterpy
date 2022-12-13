@@ -3,7 +3,7 @@ from tensorflow.keras import layers
 from tensorflow.keras.models import Model
 import numpy as np
 from tfinterpy.settings import dtype
-from tfinterpy.tf.krigeBase import TFKrigeBase
+from tfinterpy.tf.krigeBase import *
 from tfinterpy.tf.layers import KMatLayer, MVecLayer, IndiceLayer, BatchConcatenate
 
 def OKModel(innerVars, sampleLocs, samplePros, n=8, variogramLayer=None):
@@ -32,7 +32,8 @@ def OKModel(innerVars, sampleLocs, samplePros, n=8, variogramLayer=None):
     indices = layers.Input(shape=(n,), dtype="int32", name="indices")
     points = layers.Input(shape=(sampleLocs.shape[1],), dtype=dtype, name="points")
 
-    mvec = MVecLayer(sampleLocs)(indices, points)
+    locs = IndiceLayer(sampleLocs)(indices)
+    mvec = layers.Subtract()([locs, points])
     pro = IndiceLayer(samplePros)(indices)
 
     tmp2 = tf.zeros((1,),dtype="int32")

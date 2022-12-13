@@ -11,6 +11,7 @@ class KMatLayer(layers.Layer):
         return tf.vectorized_map(lambda indice: tf.gather(tf.gather(self.innerVars, indice), indice, axis=1), indices)
 
 
+# deprecated
 class MVecLayer(layers.Layer):
     def __init__(self, sampleLocs):
         super(MVecLayer, self).__init__()

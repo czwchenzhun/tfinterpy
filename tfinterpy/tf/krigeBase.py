@@ -5,6 +5,9 @@ from tfinterpy.tf.variogramLayer import NestVariogramLayer
 from tfinterpy.settings import dtype
 from tfinterpy import krigeBase
 import warnings
+import os
+
+os.environ["TF_GPU_THREAD_MODE"]="gpu_private"
 
 tf.keras.backend.set_floatx(dtype)
 
@@ -64,7 +67,8 @@ class TFKrigeBase(krigeBase.KrigeBase):
                     end = len(points)
                 points_ = points[begin:end]
                 _, nbIdx = tree.query(points_, k=N, eps=0.0)
-                pro, sigma = self.model.predict([nbIdx, points_], batch_size=batch_size)
+                dataset = tf.data.Dataset.from_tensors({'indices':nbIdx.astype("int32"), 'points':points_})
+                pro, sigma = self.model.predict(dataset, batch_size=batch_size)
                 pros = np.append(pros, pro)
                 sigmas = np.append(sigmas, sigma)
         return pros, sigmas

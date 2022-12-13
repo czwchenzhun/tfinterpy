@@ -24,7 +24,9 @@ def SKModel(innerVars, sampleLocs, samplePros, n=8, variogramLayer=None):
     indices = layers.Input(shape=(n,), dtype=tf.int32, name="indices")
     points = layers.Input(shape=(sampleLocs.shape[1],), dtype=dtype, name="points")
     kmat = KMatLayer(innerVars)(indices)
-    mvec = MVecLayer(sampleLocs)(indices, points)
+    locs = IndiceLayer(sampleLocs)(indices)
+    mvec = layers.Subtract()([locs, points])
+    # mvec = MVecLayer(sampleLocs)(indices, points)
     pro = IndiceLayer(samplePros)(indices)
     if variogramLayer != None:
         mvec = variogramLayer(mvec)
