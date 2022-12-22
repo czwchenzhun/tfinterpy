@@ -5,9 +5,6 @@ from tfinterpy.tf.variogramLayer import NestVariogramLayer
 from tfinterpy.settings import dtype
 from tfinterpy import krigeBase
 import warnings
-import os
-
-os.environ["TF_GPU_THREAD_MODE"]="gpu_private"
 
 tf.keras.backend.set_floatx(dtype)
 
@@ -49,12 +46,12 @@ class TFKrigeBase(krigeBase.KrigeBase):
             return self.__multiWorker__(points, N=N, variogram=variogram, batch_size=batch_size, workerNum=workerNum,
                                         batch_num=batch_num,
                                         device=device, **kwargs)
-
-        isNest = variogram.__class__ == NestVariogramLayer
-        self.__calcInnerVars__(variogram, isNest)
-        self.model = self.buildModel(self.innerVars, self.samples[:, :self._i], self.samples[:, self._i], N, variogram,
-                                     **kwargs)
         with tf.device(device):
+            isNest = variogram.__class__ == NestVariogramLayer
+            self.__calcInnerVars__(variogram, isNest)
+            self.model = self.buildModel(self.innerVars, self.samples[:, :self._i], self.samples[:, self._i], N,
+                                         variogram,
+                                         **kwargs)
             tree = cKDTree(self.samples[:, :self._i])
             step = batch_size * batch_num
             num = int(np.ceil(len(points) / step))
@@ -67,7 +64,8 @@ class TFKrigeBase(krigeBase.KrigeBase):
                     end = len(points)
                 points_ = points[begin:end]
                 _, nbIdx = tree.query(points_, k=N, eps=0.0)
-                dataset = tf.data.Dataset.from_tensors({'indices':nbIdx.astype("int32"), 'points':points_})
+                dataset = tf.data.Dataset.from_tensors({'indices': nbIdx.astype("int32"), 'points': points_})
+                dataset = dataset.apply(tf.data.experimental.copy_to_device(device))
                 pro, sigma = self.model.predict(dataset, batch_size=batch_size)
                 pros = np.append(pros, pro)
                 sigmas = np.append(sigmas, sigma)
