@@ -145,7 +145,6 @@ def calcHABVByVecs(vecs):
     habv[:, 3] = var
     return habv
 
-
 def calcVecs(data, includeSelf=False, repeat=True):
     '''
     Compute vectors between data.
@@ -156,27 +155,22 @@ def calcVecs(data, includeSelf=False, repeat=True):
     :return: ndarray, vectors.
     '''
     L = len(data)
+    L_1 = L-1
     if repeat:
-        vecs = []
         if includeSelf:
+            vecs = np.zeros((L*L, data.shape[1]))
             for i in range(L):
-                vec = data - data[i]
-                vecs.append(vec)
+                vecs[i*L:(i+1)*L] = data - data[i]
         else:
-            _indice = [i for i in range(L)]
+            indice = np.arange(0,L)
+            vecs = np.zeros((L * L_1, data.shape[1]))
             for i in range(L):
-                indice = list(_indice)
-                indice.pop(i)
-                vec = data[indice] - data[i]
-                vecs.append(vec)
-        vecs = np.array(vecs,dtype=np.float32)
-        return vecs.reshape((vecs.shape[0] * vecs.shape[1], vecs.shape[2]))
+                vecs[i*L_1:(i+1)*L_1] = data[indice[indice!=i]] - data[i]
     else:
-        vecs = np.empty((0, data.shape[1]),dtype=np.float32)
-        for i in range(L - 1):
-            vec = data[i + 1:] - data[i]
-            vecs = np.append(vecs, vec, axis=0)
-        return vecs
+        vecs = np.zeros((L_1*(L_1+1)//2, data.shape[1]),dtype=np.float32) # empty + append too slow
+        for i in range(L_1):
+            vecs[:L_1-i] = data[i + 1:] - data[i]
+    return vecs
 
 
 def kSplit(ndarray, k):
