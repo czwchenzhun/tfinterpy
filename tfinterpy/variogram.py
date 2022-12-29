@@ -242,7 +242,7 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
     nestVariogram = NestVariogram([vb.getVariogram() for vb in variogramBuilders], unitVectors[availableDir], weights)
     return nestVariogram, variogramBuilders
 
-
+import time
 def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairNum=10, lagNum=20, lagInterval=None,
                                         lagTole=None, bandWidth=None, model=None, calcWeight=False):
     '''
@@ -306,6 +306,7 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
     indiceTheta1 = indiceTheta1.astype('int')
     indiceTheta2 = thetas2 // dipStep
     indiceTheta2 = indiceTheta2.astype('int')
+    t=time.perf_counter()
     for i in range(partitionNum[0]):
         for j in range(partitionNum[1]):
             unitVector = unitVectors[i * partitionNum[1] + j]
@@ -317,7 +318,9 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
                 indice = np.where(
                     ((indiceTheta1 == i) & (indiceTheta2 == j) & (norms > lagRanList[k][0]) & (
                             norms < lagRanList[k][1]) & (bands < bandWidth)))[0]
+                # 这段代码太耗时了，三重循环且最内层循环np.where内的查询条件复杂（要遍历3个数组，共遍历5次），相当于四重循环
                 bucket[i][j][k] = list(zip(norms[indice], vars[indice]))
+    print(time.perf_counter()-t)
     processedBucket = [[[] for j in range(partitionNum[1])] for i in range(partitionNum[0])]
     searchedPairNumRecords = [[[] for j in range(partitionNum[1])] for i in range(partitionNum[0])]
     for i in range(partitionNum[0]):
