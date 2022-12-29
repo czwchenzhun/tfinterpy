@@ -114,7 +114,7 @@ def calcHAVByVecs(vecs):
     angle = np.arctan2(vecs[:, 1], vecs[:, 0])
     angle[angle < 0] += np.pi
     var = 0.5 * (vecs[:, 2] ** 2)
-    hav = np.zeros((len(vecs), 3),dtype=np.float32)
+    hav = np.zeros((len(vecs), 3), dtype=np.float32)
     hav[:, 0] = distance
     hav[:, 1] = angle
     hav[:, 2] = var
@@ -138,12 +138,13 @@ def calcHABVByVecs(vecs):
     dip = np.arctan2(vecs[:, 2], norm)
     dip[dip < 0] += np.pi
     var = 0.5 * (vecs[:, 3] ** 2)
-    habv = np.zeros((len(vecs), 4),dtype=np.float32)
+    habv = np.zeros((len(vecs), 4), dtype=np.float32)
     habv[:, 0] = distance
     habv[:, 1] = azimuth
     habv[:, 2] = dip
     habv[:, 3] = var
     return habv
+
 
 def calcVecs(data, includeSelf=False, repeat=True):
     '''
@@ -155,21 +156,23 @@ def calcVecs(data, includeSelf=False, repeat=True):
     :return: ndarray, vectors.
     '''
     L = len(data)
-    L_1 = L-1
+    L_1 = L - 1
     if repeat:
         if includeSelf:
-            vecs = np.zeros((L*L, data.shape[1]))
+            vecs = np.zeros((L * L, data.shape[1]))
             for i in range(L):
-                vecs[i*L:(i+1)*L] = data - data[i]
+                vecs[i * L:(i + 1) * L] = data - data[i]
         else:
-            indice = np.arange(0,L)
+            indice = np.arange(0, L)
             vecs = np.zeros((L * L_1, data.shape[1]))
             for i in range(L):
-                vecs[i*L_1:(i+1)*L_1] = data[indice[indice!=i]] - data[i]
+                vecs[i * L_1:(i + 1) * L_1] = data[indice[indice != i]] - data[i]
     else:
-        vecs = np.zeros((L_1*(L_1+1)//2, data.shape[1]),dtype=np.float32) # empty + append too slow
+        vecs = np.zeros((L_1 * (L_1 + 1) // 2, data.shape[1]), dtype=np.float32)  # empty + append too slow
+        b = 0
         for i in range(L_1):
-            vecs[:L_1-i] = data[i + 1:] - data[i]
+            vecs[b:b + L_1 - i] = data[i + 1:] - data[i]
+            b += L_1 - i
     return vecs
 
 

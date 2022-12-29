@@ -187,12 +187,14 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
     indiceTheta = thetas // azimuthStep
     indiceTheta = indiceTheta.astype('int')
     for i in range(partitionNum):
-        deltas = thetas - azimuths[i]
-        bands = norms * deltas
+        indice = np.where((indiceTheta == i))[0]
+        deltas = thetas[indice] - azimuths[i]
+        norms_ = norms[indice]
+        vars_ = vars[indice]
+        bands = norms_ * deltas
         for j in range(lagNum):
-            indice = np.where(
-                ((indiceTheta == i) & (norms > lagRanList[j][0]) & (norms < lagRanList[j][1]) & (bands < bandWidth)))[0]
-            bucket[i][j] = list(zip(norms[indice], vars[indice]))
+            indice = np.where(((norms_ > lagRanList[j][0]) & (norms_ < lagRanList[j][1]) & (bands < bandWidth)))[0]
+            bucket[i][j] = list(zip(norms_[indice], vars_[indice]))
     processedBucket = [[] for i in range(partitionNum)]
     searchedPairNumRecords = [[] for i in range(partitionNum)]
     for i in range(partitionNum):
@@ -242,7 +244,7 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
     nestVariogram = NestVariogram([vb.getVariogram() for vb in variogramBuilders], unitVectors[availableDir], weights)
     return nestVariogram, variogramBuilders
 
-import time
+
 def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairNum=10, lagNum=20, lagInterval=None,
                                         lagTole=None, bandWidth=None, model=None, calcWeight=False):
     '''
@@ -306,21 +308,23 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
     indiceTheta1 = indiceTheta1.astype('int')
     indiceTheta2 = thetas2 // dipStep
     indiceTheta2 = indiceTheta2.astype('int')
-    t=time.perf_counter()
     for i in range(partitionNum[0]):
         for j in range(partitionNum[1]):
+            indice = np.where(((indiceTheta1 == i) & (indiceTheta2 == j)))[0]  # 初步筛选出在角度范围内的索引
+            if len(indice) == 0:
+                continue
             unitVector = unitVectors[i * partitionNum[1] + j]
-            angles = np.arccos(np.dot(vecs, unitVector) / norms)
+            norms_ = norms[indice]
+            vars_ = vars[indice]
+            angles = np.arccos(np.dot(vecs[indice], unitVector) / norms_)  # 计算向量和单位向量的夹角
             indice = np.where(angles > np.pi / 2)[0]
             angles[indice] = np.pi - angles[indice]
-            bands = norms * np.sin(angles)
+            bands = norms_ * np.sin(angles)
             for k in range(lagNum):
                 indice = np.where(
-                    ((indiceTheta1 == i) & (indiceTheta2 == j) & (norms > lagRanList[k][0]) & (
-                            norms < lagRanList[k][1]) & (bands < bandWidth)))[0]
-                # 这段代码太耗时了，三重循环且最内层循环np.where内的查询条件复杂（要遍历3个数组，共遍历5次），相当于四重循环
-                bucket[i][j][k] = list(zip(norms[indice], vars[indice]))
-    print(time.perf_counter()-t)
+                    ((norms_ > lagRanList[k][0]) & (
+                            norms_ < lagRanList[k][1]) & (bands < bandWidth)))[0]
+                bucket[i][j][k] = list(zip(norms_[indice], vars_[indice]))
     processedBucket = [[[] for j in range(partitionNum[1])] for i in range(partitionNum[0])]
     searchedPairNumRecords = [[[] for j in range(partitionNum[1])] for i in range(partitionNum[0])]
     for i in range(partitionNum[0]):
