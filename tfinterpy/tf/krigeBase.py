@@ -62,10 +62,12 @@ class TFKrigeBase(krigeBase.KrigeBase):
                 end = (i + 1) * step
                 if end > len(points):
                     end = len(points)
+                if begin==end:
+                    break
                 points_ = points[begin:end]
                 _, nbIdx = tree.query(points_, k=N, eps=0.0)
                 dataset = tf.data.Dataset.from_tensors({'indices': nbIdx.astype("int32"), 'points': points_})
-                dataset = dataset.apply(tf.data.experimental.copy_to_device(device))
+                # dataset = dataset.apply(tf.data.experimental.copy_to_device(device))
                 pro, sigma = self.model.predict(dataset, batch_size=batch_size)
                 pros = np.append(pros, pro)
                 sigmas = np.append(sigmas, sigma)

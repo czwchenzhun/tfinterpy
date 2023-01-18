@@ -25,25 +25,29 @@ def power(scale, exp, C0, h):
     '''
     return scale * (h ** exp) + C0
 
+# nugget (C0), sill (C0+C), range(a)
+# C should greater than 0, otherwise variogram curve will be a line.
+# In the guarantee mae minimum, the bigger a and C, the better.
 
 def gaussian(C, a, C0, h):
     '''
     Gaussian model.
 
-    :param C: number, sill.
+    :param C: number, arch.
     :param a: number, range.
     :param C0: number, nugget.
     :param h: number or ndarray, distance.
     :return: number or ndarray.
     '''
     return C * (1.0 - np.exp(-(h ** 2.0) / (a * 4.0 / 7.0) ** 2.0)) + C0
+    # return C * (1.0 - np.exp(-(h ** 2.0) / a ** 2.0)) + C0
 
 
 def exponent(C, a, C0, h):
     '''
     Exponent model.
 
-    :param C: number, sill.
+    :param C: number, arch.
     :param a: number, range.
     :param C0: number, nugget.
     :param h: number or ndarray, distance.
@@ -56,7 +60,7 @@ def spherical(C, a, C0, h):
     '''
     Spherical model.
 
-    :param C: number, sill.
+    :param C: number, arch.
     :param a: number, range.
     :param C0: number, nugget.
     :param h: number or ndarray, distance.

@@ -4,6 +4,7 @@ from tensorflow.keras.models import Model
 from tfinterpy.settings import dtype
 from tfinterpy.tf.layers import KMatLayer, MVecLayer, IndiceLayer
 from tfinterpy.tf.krigeBase import TFKrigeBase
+from tfinterpy.tf.ukTrendFunc import *
 
 
 class ConcatMVecLayer(layers.Layer):
@@ -46,80 +47,6 @@ class ConcatKMatLayer(layers.Layer):
 
         return tf.map_fn(func, (kmat, indices), fn_output_signature=dtype)
 
-
-class TrendFunc(layers.Layer):
-    def __init__(self):
-        super(TrendFunc, self).__init__()
-        self.items = []
-
-    @tf.function(jit_compile=True)
-    def call(self, loc):
-        res = tf.concat([[]], 0)
-        for f in self.items:
-            res = tf.concat([res, [f(loc)]], 0)
-        return res
-
-    def __len__(self):
-        return len(self.items)
-
-
-class Linear2(TrendFunc):
-    '''
-    x+y
-    m(x) = a1*x + a2*y
-    '''
-
-    def __init__(self):
-        super(Linear2, self).__init__()
-        self.items.append(lambda p: p[0])
-        self.items.append(lambda p: p[1])
-
-
-class Linear3(TrendFunc):
-    '''
-    x+y+z
-    m(x) = a1*x + a2*y + a3*z
-    '''
-
-    def __init__(self):
-        super(Linear3, self).__init__()
-        self.items.append(lambda p: p[0])
-        self.items.append(lambda p: p[1])
-        self.items.append(lambda p: p[2])
-
-
-class Quadratic2(TrendFunc):
-    '''
-    (x+y)^2
-    m(x) = a1*x + a2*y + a3*x^2 + a4*y^2 + a5*x*y
-    '''
-
-    def __init__(self):
-        super(Quadratic2, self).__init__()
-        # self.items.append(lambda p: p[0])
-        # self.items.append(lambda p: p[1])
-        # self.items.append(lambda p: p[0] * p[0])
-        # self.items.append(lambda p: p[1] * p[1])
-        # self.items.append(lambda p: 2 * p[0] * p[1])
-        self.items.append(lambda p: 0.5*(3*(p[0]*p[0] + p[1]*p[1] + 2*p[0]+p[1])-1))
-
-
-class Quadratic3(TrendFunc):
-    '''
-    (x+y+z)^2
-    m(x) = x^2 + y^2 + z^2 + 2*x*y + 2*x*z + 2*y*z
-    '''
-
-    def __init__(self):
-        super(Quadratic3, self).__init__()
-        self.items.append(lambda p: p[0] * p[0])
-        self.items.append(lambda p: p[1] * p[1])
-        self.items.append(lambda p: p[2] * p[2])
-        self.items.append(lambda p: p[0] * p[1])
-        self.items.append(lambda p: 2 * p[0] * p[2])
-        self.items.append(lambda p: 2 * p[1] * p[2])
-
-
 def UKModel(innerVars, sampleLocs, samplePros, n=8, variogramLayer=None, trendFunc=None):
     '''
     Construction a keras model for Ordinary Kriging algorithm.
@@ -133,7 +60,7 @@ def UKModel(innerVars, sampleLocs, samplePros, n=8, variogramLayer=None, trendFu
     '''
     dim = sampleLocs.shape[1]
     if trendFunc == None:
-        trendFunc = Linear2() if dim == 2 else Linear3()
+        trendFunc = Linear2D() if dim == 2 else Linear3D()
 
     innerVars = tf.convert_to_tensor(innerVars)
     sampleLocs = tf.convert_to_tensor(sampleLocs)
@@ -163,7 +90,7 @@ def UKModel(innerVars, sampleLocs, samplePros, n=8, variogramLayer=None, trendFu
     lambvec = layers.Reshape((n + len(trendFunc) + 1,))(lambvec)
     mvec = layers.Reshape((n + len(trendFunc) + 1,))(mvec)
     sigma = layers.Dot(1)([lambvec, mvec])
-    estimate = estimate + layers.Dot(1)([lambvec[:, n:], mvec[:, n:]])
+    # estimate = estimate + layers.Dot(1)([lambvec[:, n:], mvec[:, n:]])#这一行不需要，测试二次趋势函数发现不论是+还是-这一行都会导致插值结果误差极大，大得离谱
     model = Model(inputs=[indices, points], outputs=[estimate, sigma])
     return model
 
