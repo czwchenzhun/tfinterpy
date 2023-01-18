@@ -1,95 +1,10 @@
 from tfinterpy.utils import *
 from tfinterpy.settings import dtype
 from tfinterpy.variogramExp import search2d, search3d
-from tfinterpy.variogramModel import variogramModel, VariogramModelMap
-from scipy.optimize import least_squares
-from functools import partial
+from tfinterpy.variogramModel import VariogramModelMap
+from tfinterpy.variogramBuilder import VariogramBuilder
 
-EPS = 1e-16
-
-
-def resident(params, x, y, variogram_function):
-    '''
-    This function is used to calculate resident.
-
-    :param params: tuple, represents the parameters passed to the variogram function.
-    :param x: number or ndarray, distance.
-    :param y: number or ndarray, semivariance.
-    :param variogram_function: function, variogram function.
-    :return: number or ndarray, resident=( variogram(x,params[0],...,params[n])-y )^2
-    '''
-    # error = variogram_function(x, *params) - y
-    error = variogram_function(*params, x) - y
-    return error ** 2
-
-
-def getX0AndBnds(h, y, variogram_model):
-    '''
-    Calculate the initial value and range of parameters(nugget, sill, range, ...)
-    according to the variogram function model.
-
-    :param h: array_like, distance.
-    :param y: array_like, semivariance.
-    :param variogram_model: str, indicates the variogram function model.
-    :return: tuple, (x0,bnds). x0 represents the initial value of the parameters,
-        and bnds represents the range of the parameters.
-    '''
-    if variogram_model == "linear":
-        x0 = [(np.amax(y) - np.amin(y)) / 2 / (np.amax(h) - np.amin(h)), np.amin(y)]
-        bnds = ([0.0, 0.0], [np.inf, np.amax(y)])
-    elif variogram_model == "power":
-        x0 = [(np.amax(y) - np.amin(y)) / (np.amax(h) - np.amin(h)), 1.0, np.amin(y)]
-        bnds = ([0.0, 0.001, 0.0], [np.inf, 1.999, np.amax(y)])
-    else:
-        x0 = [(np.amax(y) - np.amin(y)) / 2, 0.5 * np.amax(h), np.amin(y)]
-        bnds = ([0.0, 0.0, 0.0], [np.amax(y), np.amax(h), np.amax(y)])
-    return x0, bnds
-
-
-class VariogramBuilder:
-    '''
-    VariogramBuilder class is used to build variogram function.
-    '''
-
-    def __init__(self, lags, model="spherical"):
-        '''
-        The VariogramBuilder is constructed with lags and string indicating the model.
-
-        :param lags: array_like, a lag is [distance,semivariance].
-        :param model: str, indicates the variogram function model.
-        '''
-        self.model = model
-        self.lags = np.array(lags, dtype=dtype)
-        x0, bnds = getX0AndBnds(self.lags[:, 0], self.lags[:, 1], model)
-        res = least_squares(resident, x0, bounds=bnds, loss="huber",
-                            args=(self.lags[:, 0], self.lags[:, 1], variogramModel(model)))
-        self.params = res.x
-        self.mae = np.mean(res.fun)
-
-    def showVariogram(self, axes=None):
-        '''
-        Plot variogram.
-
-        :param axes: axes, if axes is set to None, plot on a new axes.
-        :return: None.
-        '''
-        if axes is None:
-            import matplotlib.pyplot as axes
-        variogram = self.getVariogram()
-        axes.scatter(self.lags[:, 0], self.lags[:, 1], alpha=0.5)
-        max = np.max(self.lags[:, 0])
-        X = np.arange(0, max, max / 100)
-        Y = variogram(X)
-        axes.plot(X, Y, alpha=0.5, color="red", label=self.model)
-
-    def getVariogram(self):
-        '''
-        Get variogram function(closure function).
-        :return: function.
-        '''
-        func = variogramModel(self.model)
-        pfunc = partial(func, *self.params)
-        return pfunc
+EPS = 1e-6
 
 
 class NestVariogram:
@@ -120,8 +35,12 @@ class NestVariogram:
         '''
         totalVar = 0
         if self.weights is None:
+            vecLen = np.linalg.norm(vec, axis=-1)
             for idx, unitVector in enumerate(self.unitVectors):
-                h = np.abs(np.dot(vec, unitVector))
+                proj = np.abs(np.dot(vec, unitVector))
+                # h = 0.9*proj + 0.1*vecLen
+                h = proj
+                # h[np.isnan(h)]=0
                 var = self.variograms[idx](h)
                 totalVar += var
         else:
@@ -196,6 +115,7 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
             indice = np.where(((norms_ > lagRanList[j][0]) & (norms_ < lagRanList[j][1]) & (bands < bandWidth)))[0]
             bucket[i][j] = list(zip(norms_[indice], vars_[indice]))
     processedBucket = [[] for i in range(partitionNum)]
+    lagNumBeforeAvg = [[] for i in range(partitionNum)]
     searchedPairNumRecords = [[] for i in range(partitionNum)]
     for i in range(partitionNum):
         for j in range(lagNum):
@@ -204,43 +124,39 @@ def calculateOmnidirectionalVariogram2D(samples, partitionNum=8, leastPairNum=10
                 continue
             searchedPairNumRecords[i].append(searchedPairNum)
             lag = np.mean(bucket[i][j], axis=0)
+            lagNumBeforeAvg[i].append(len(bucket[i][j]))
             processedBucket[i].append(lag)
     lagsList = [None for i in range(partitionNum)]
+    lagNumBeforeAvgList = [None for i in range(partitionNum)]
     availableDir = []
     for i in range(partitionNum):
         if len(processedBucket[i]) > leastPairNum:
             lagsList[i] = processedBucket[i]
+            lagNumBeforeAvgList[i] = np.array(lagNumBeforeAvg[i])
             availableDir.append(i)
     variogramBuilders = []
-    totalLagNum = 0
+    lagNumBeforeAvgSum = []
     if model is None:
-        for lags in lagsList:
+        for idx, lags in enumerate(lagsList):
             if lags is None:
                 continue
             minResident = float('+inf')
             best = None
             for key in VariogramModelMap:
-                vb = VariogramBuilder(lags, key)
+                vb = VariogramBuilder(lags, key, lagNumBeforeAvgList[idx])
                 if vb.mae < minResident:
                     minResident = vb.mae
                     best = vb
             variogramBuilders.append(best)
-            totalLagNum += len(lags)
+            lagNumBeforeAvgSum.append(np.sum(lagNumBeforeAvgList[idx]))
     else:
-        for lags in lagsList:
+        for idx, lags in enumerate(lagsList):
             if lags is None:
                 continue
             vb = VariogramBuilder(lags, model)
             variogramBuilders.append(vb)
-            totalLagNum += len(lags)
-    weights = None
-    if calcWeight:
-        weights = []
-        for lags in lagsList:
-            if lags is None:
-                continue
-            weights.append(len(lags) / totalLagNum)
-        weights = np.array(weights, dtype=dtype)
+            lagNumBeforeAvgSum.append(np.sum(lagNumBeforeAvgList[idx]))
+    weights = lagNumBeforeAvgSum / np.sum(lagNumBeforeAvgSum) if calcWeight else None
     nestVariogram = NestVariogram([vb.getVariogram() for vb in variogramBuilders], unitVectors[availableDir], weights)
     return nestVariogram, variogramBuilders
 
@@ -297,7 +213,7 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
     if lagInterval is None:
         lagInterval = norms.max() * 0.75 / lagNum
     if lagTole is None:
-        lagTole = lagInterval / 2
+        lagTole = lagInterval / 3
     lagRanList = [[(i + 1) * lagInterval - lagTole, (i + 1) * lagInterval + lagTole] for i in range(lagNum)]
     bucket = [[[[] for k in range(lagNum)] for j in range(partitionNum[1])] for i in range(partitionNum[0])]
     thetas1 = np.arctan2(vecs[:, 1], vecs[:, 0])
@@ -326,6 +242,7 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
                             norms_ < lagRanList[k][1]) & (bands < bandWidth)))[0]
                 bucket[i][j][k] = list(zip(norms_[indice], vars_[indice]))
     processedBucket = [[[] for j in range(partitionNum[1])] for i in range(partitionNum[0])]
+    lagNumBeforeAvg = [[[] for j in range(partitionNum[1])] for i in range(partitionNum[0])]
     searchedPairNumRecords = [[[] for j in range(partitionNum[1])] for i in range(partitionNum[0])]
     for i in range(partitionNum[0]):
         for j in range(partitionNum[1]):
@@ -335,45 +252,43 @@ def calculateOmnidirectionalVariogram3D(samples, partitionNum=[6, 6], leastPairN
                     continue
                 searchedPairNumRecords[i][j].append(searchedPairNum)
                 lag = np.mean(bucket[i][j][k], axis=0)
+                lagNumBeforeAvg[i][j].append(len(bucket[i][j][k]))
                 processedBucket[i][j].append(lag)
     lagsList = [None for i in range(partitionNum[0] * partitionNum[1])]
+    lagNumBeforeAvgList = [None for i in range(partitionNum[0] * partitionNum[1])]
     availableDir = []
     for i in range(partitionNum[0]):
         for j in range(partitionNum[1]):
             if len(processedBucket[i][j]) > leastPairNum:
                 idx = i * partitionNum[1] + j
                 lagsList[idx] = processedBucket[i][j]
+                lagNumBeforeAvgList[idx] = np.array(lagNumBeforeAvg[i][j])
                 availableDir.append(idx)
     variogramBuilders = []
-    totalLagNum = 0
+    lagNumBeforeAvgSum = []
     if model is None:
-        for lags in lagsList:
+        for idx, lags in enumerate(lagsList):
             if lags is None:
                 continue
             minResident = float('+inf')
             best = None
             for key in VariogramModelMap:
-                vb = VariogramBuilder(lags, key)
+                vb = VariogramBuilder(lags, key, lagNumBeforeAvgList[idx])
                 if vb.mae < minResident:
                     minResident = vb.mae
                     best = vb
             variogramBuilders.append(best)
-            totalLagNum += len(lags)
+            # variogramBuilders.append(VariogramBuilderPSO(lags))
+            lagNumBeforeAvgSum.append(np.sum(lagNumBeforeAvgList[idx]))
     else:
-        for lags in lagsList:
+        for idx, lags in enumerate(lagsList):
             if lags is None:
                 continue
             vb = VariogramBuilder(lags, model)
             variogramBuilders.append(vb)
-            totalLagNum += len(lags)
-    weights = None
-    if calcWeight:
-        weights = []
-        for lags in lagsList:
-            if lags is None:
-                continue
-            weights.append(len(lags) / totalLagNum)
-        weights = np.array(weights, dtype=dtype)
+            lagNumBeforeAvgSum.append(np.sum(lagNumBeforeAvgList[idx]))
+    lagNumBeforeAvgSum = np.array(lagNumBeforeAvgSum)
+    weights = lagNumBeforeAvgSum / np.sum(lagNumBeforeAvgSum) if calcWeight else None
     nestVariogram = NestVariogram([vb.getVariogram() for vb in variogramBuilders], unitVectors[availableDir], weights)
     return nestVariogram, variogramBuilders
 
