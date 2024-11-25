@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow.keras.backend as K
-from tensorflow.keras import layers
+from tensorflow.keras import layers, Layer
 from tensorflow.keras.models import Model
 from scipy.spatial import cKDTree
 import numpy as np
@@ -265,7 +265,14 @@ def OKModel(n=8, variogramLayer=None, vecDim=2):
         kmat = kmat_
         mvec = mvec_
         mvec = layers.Reshape((n + 1, 1))(mvec)
-    kmatInv = tf.linalg.pinv(kmat)
+    #kmatInv = tf.linalg.pinv(kmat) # Original statement
+    # Fix for ValueError: A KerasTensor cannot be used as input to a TensorFlow function.
+    # A KerasTensor is a symbolic placeholder for a shape and dtype, used when constructing Keras Functional models or Keras Functions.
+    # You can only use it as input to a Keras layer or a Keras operation (from the namespaces `keras.layers` and `keras.operations`).
+    class EmbeddedLayer(Layer):
+        def call(self, x):
+            return tf.linalg.pinv(x)
+    kmatInv = EmbeddedLayer()(kmat)
     lambvec = layers.Dot(1)([kmatInv, mvec])
     estimate = layers.Dot(1)([pro, lambvec[:, :n]])
 
