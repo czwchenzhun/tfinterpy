@@ -6,6 +6,7 @@ from scipy.spatial import cKDTree
 import numpy as np
 from tfinterpy.utils import kSplit, calcVecs
 from tfinterpy.tf.variogramLayer import NestVariogramLayer
+from tfinterpy.tf.commonLayer import InvLayer, MeanLayer, SumLayer
 
 # tf.keras.backend.set_floatx('float64')
 
@@ -22,18 +23,18 @@ def SKModel(n=8, variogramLayer=None, vecDim=2):
     if variogramLayer != None and variogramLayer.__class__ == NestVariogramLayer:
         mvec_ = layers.Input(shape=(n, vecDim))
     else:
-        mvec_ = layers.Input(shape=(n))
-    pro = layers.Input(shape=(n))
+        mvec_ = layers.Input(shape=(n,))
+    pro = layers.Input(shape=(n,))
     if variogramLayer != None:
         mvec = variogramLayer(mvec_)
     else:
         mvec = mvec_
     mvec = layers.Reshape((n, 1))(mvec)
-    kmatInv = tf.linalg.pinv(kmat)
+    kmatInv = InvLayer()(kmat)
     lambvec = layers.Dot(1)([kmatInv, mvec])
     estimate = layers.Dot(1)([pro, lambvec])
-    promean = K.mean(pro, axis=1)
-    eps = K.sum(lambvec, axis=1)
+    promean = MeanLayer()(pro)
+    eps = SumLayer()(lambvec)
     promean = layers.Reshape((1,))(promean)
     eps = layers.Reshape((1,))(eps)
     estimate = estimate + promean * (1 - eps)
@@ -250,7 +251,7 @@ def OKModel(n=8, variogramLayer=None, vecDim=2):
     if variogramLayer != None and variogramLayer.__class__ == NestVariogramLayer:
         mvec_ = layers.Input(shape=(n + 1, vecDim))
     else:
-        mvec_ = layers.Input(shape=(n + 1))
+        mvec_ = layers.Input(shape=(n + 1,))
     pro = layers.Input(shape=(n,))
     if variogramLayer != None:
         mvec = variogramLayer(mvec_)
@@ -265,7 +266,7 @@ def OKModel(n=8, variogramLayer=None, vecDim=2):
         kmat = kmat_
         mvec = mvec_
         mvec = layers.Reshape((n + 1, 1))(mvec)
-    kmatInv = tf.linalg.pinv(kmat)
+    kmatInv = InvLayer()(kmat)
     lambvec = layers.Dot(1)([kmatInv, mvec])
     estimate = layers.Dot(1)([pro, lambvec[:, :n]])
 

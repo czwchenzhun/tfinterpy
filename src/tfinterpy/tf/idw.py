@@ -4,7 +4,7 @@ from tensorflow.keras.models import Model
 from scipy.spatial import cKDTree
 import numpy as np
 from tfinterpy.utils import kSplit
-
+from tfinterpy.tf.commonLayer import SumLayer
 
 def IDWModel(n=8, alpha=2):
     '''
@@ -14,11 +14,11 @@ def IDWModel(n=8, alpha=2):
     :param alpha: number, distance power factor.
     :return: keras' Model object.
     '''
-    h_ = layers.Input(shape=(n))
-    pro = layers.Input(shape=(n))
+    h_ = layers.Input(shape=(n,))
+    pro = layers.Input(shape=(n,))
     h = h_ ** alpha
     hinv = 1 / (h + 1e-8)
-    total = K.sum(hinv, axis=1)
+    total = SumLayer()(hinv)
     total = layers.Reshape((1,))(total)
     weights = hinv / total
     estimate = layers.Dot(1)([pro, weights])
