@@ -22,9 +22,13 @@ Snapshot of GUI tool.
 #### Requirements
 
 **Minimum usage requirements:** Python 3+, Numpy, SciPy
+
 **TensorFlow based algorithm:** TensorFlow 2
+
 **GSLIB file support:** Pandas
+
 **3D visualization:** VTK  
+
 **GUI Tool:** PyQT5
 
 -----
