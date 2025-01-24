@@ -61,6 +61,7 @@ class SK:
                 mvec = variogram(mvec)
             else:
                 mvec = variogram(nbd[idx])
+            np.fill_diagonal(kmat, 0.0)
             try:
                 lambvec = np.linalg.inv(kmat).dot(mvec)
             except:
@@ -141,6 +142,7 @@ class SK:
                 mvec = variogram(mvec)
             else:
                 mvec = variogram(nbd[idx][1:])
+            np.fill_diagonal(kmat, 0.0)
             try:
                 lambvec = np.linalg.inv(kmat).dot(mvec)
             except:
