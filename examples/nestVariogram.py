@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from tfinterpy.variogram import calculateOmnidirectionalVariogram2D
-from examples.ncFileUtil import getSamples
+from ncFileUtil import getSamples
 from tfinterpy.utils import calcVecs
 
 if __name__ == "__main__":

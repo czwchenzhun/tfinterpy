@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from tfinterpy.variogram import VariogramBuilder
 from tfinterpy.variogramExp import search2d
-from examples.ncFileUtil import getSamples
+from ncFileUtil import getSamples
 from tfinterpy.utils import calcVecs, calcHAVByVecs
 import numpy as np
 

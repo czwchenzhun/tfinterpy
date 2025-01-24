@@ -1,7 +1,7 @@
 from tfinterpy.idw import IDW
 from tfinterpy.grid import Grid2D
-from examples.ncFileUtil import getSamples
-from examples.plotUtils import *
+from ncFileUtil import getSamples
+from plotUtils import *
 import numpy as np
 import random
 

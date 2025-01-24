@@ -10,7 +10,7 @@ if __name__ == "__main__":
     print(tf.config.experimental.list_physical_devices('CPU'))  # Prints all CPU devices.
     print(tf.config.experimental.list_physical_devices('GPU'))  # Prints all GPU devices.
 
-    filePath = "../data/sample_data.gslib"
+    filePath = "data/sample_data.gslib"
     N = 8
     df = readGslibPoints(filePath)# Read 3d points from gslib file.
     print(df.describe())
@@ -34,4 +34,4 @@ if __name__ == "__main__":
     actor = createGridActor(*grid.dim, grid.x, grid.y, grid.z, grid.pro,
                             [samples[:, 3].min(), samples[:, 3].max()], CM.Rainbow)
     rendering(actor)# Rendering vtkActor.
-    saveVTKGrid('../savedData/grid.vtk', actor.GetMapper().GetInput())# Save grid data to vtk file.
+    saveVTKGrid('savedData/grid.vtk', actor.GetMapper().GetInput())# Save grid data to vtk file.

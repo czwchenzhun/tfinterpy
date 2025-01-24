@@ -69,8 +69,13 @@ pip install vtk==9.4.1
     ```
 - If you need to use the built-in GUI tools (see "examples/gui" for usage) provided, please install full dependencies as above list.
 
-netcdf4 also needs to be installed to **run the examples** in the examples folder:
+### Run examples
+
+All of the sample code can be found in the "examples" folder, the examples directory is recommended as the working directory.
+
+netCDF4 needs to be installed first to load the data.
 ```
 pip install netCDF4==1.7.2
 ```
+
 

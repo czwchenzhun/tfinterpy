@@ -19,6 +19,7 @@ if __name__ == "__main__":
     grid.rectlinear((100, 100, 10), (samples[:, 0].min(), samples[:, 0].max()),
                     (samples[:, 1].min(), samples[:, 1].max()), (samples[:, 2].min(), samples[:, 2].max()))
     exe = SK(samples, '3d')# Create a sk interpolator.
+    
     vb = calculateDefaultVariogram3D(samples)# Calculate a default variogram function.
     plt.figure()
     vb.showVariogram()

@@ -1,8 +1,8 @@
 from tfinterpy.krige import SK
 from tfinterpy.grid import Grid2D
 from tfinterpy.variogram import calculateDefaultVariogram2D
-from examples.ncFileUtil import getSamples
-from examples.plotUtils import *
+from ncFileUtil import getSamples
+from plotUtils import *
 import numpy as np
 import random
 

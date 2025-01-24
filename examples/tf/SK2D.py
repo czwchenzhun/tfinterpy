@@ -1,7 +1,7 @@
 from tfinterpy.tf.krige import TFSK
 from tfinterpy.grid import Grid2D
-from examples.ncFileUtil import getSamples
-from examples.plotUtils import *
+from ncFileUtil import getSamples
+from plotUtils import *
 import numpy as np
 import tensorflow as tf
 from tfinterpy.variogram import calculateDefaultVariogram2D
@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     # Get sample points and original elevation data from netcdf file
     # containing Digital Elevation Model data.
-    samples, lats, lons, ele = getSamples("../data/tatitlek_815_mhhw_2011.nc", 'lat', 'lon', 'Band1',
+    samples, lats, lons, ele = getSamples("data/tatitlek_815_mhhw_2011.nc", 'lat', 'lon', 'Band1',
                                           offset, (W, H), M)
 
     # Create linear 2D grid.

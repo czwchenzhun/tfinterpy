@@ -14,7 +14,7 @@ if __name__ == "__main__":
     print(tf.config.experimental.list_physical_devices('CPU'))  # Prints all CPU devices.
     print(tf.config.experimental.list_physical_devices('GPU'))  # Prints all GPU devices.
 
-    filePath = "../data/sample_data.gslib"
+    filePath = "data/sample_data.gslib"
     N = 8
     df = readGslibPoints(filePath)# Read 3d points from gslib file.
     print(df.describe())
@@ -46,4 +46,4 @@ if __name__ == "__main__":
     # Create an actor representing a rectilinear grid and use the kriging variances for color mapping.
     actor = createGridActor(*grid.dim, grid.x, grid.y, grid.z, grid.sigma, None, CM.Rainbow)
     rendering(actor)# Rendering vtkActor.
-    saveVTKGrid('../savedData/grid.vtk', actor.GetMapper().GetInput())# Save grid data(kriging variances) to vtk file.
+    saveVTKGrid('savedData/grid.vtk', actor.GetMapper().GetInput())# Save grid data(kriging variances) to vtk file.

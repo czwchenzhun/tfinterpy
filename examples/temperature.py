@@ -1,5 +1,5 @@
 from tfinterpy.krige import OK
-from examples.plotUtils import *
+from plotUtils import *
 from tfinterpy.variogram import calculateOmnidirectionalVariogram2D
 from tfinterpy.utils import calcVecs
 import pandas as pd
