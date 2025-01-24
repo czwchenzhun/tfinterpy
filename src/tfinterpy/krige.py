@@ -223,7 +223,7 @@ class OK:
                 mvec[:N] = variogram(vecs)
             else:
                 mvec[:N] = variogram(nbd[idx])
-            # np.fill_diagonal(kmat,0.0)
+            np.fill_diagonal(kmat, 0.0)
             try:
                 lambvec = np.linalg.inv(kmat).dot(mvec)
             except:
@@ -306,7 +306,7 @@ class OK:
                 mvec[:N] = variogram(vecs)
             else:
                 mvec[:N] = variogram(nbd[idx][1:])
-            # np.fill_diagonal(kmat,0.0)
+            np.fill_diagonal(kmat, 0.0)
             try:
                 lambvec = np.linalg.inv(kmat).dot(mvec)
             except:
